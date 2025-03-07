@@ -1,7 +1,7 @@
 {
 	"appId": "com.example.myappnew",
 	"appName": "配送系统",
-	"webDir": "C:\\Users\\g\\Desktop\\代码\\demo\\vite\\dist",
+	"webDir": "dist",
 	"plugins": {
 		"CapacitorUpdater": {
 			"autoUpdate": false,
@@ -43,6 +43,7 @@
 		}
 	},
 	"server": {
+		"url": "http://192.168.0.102:5173",
 		"cleartext": true
 	}
 }

@@ -1,0 +1,142 @@
+# 通用忽略规则
+###################
+
+# 日志文件
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 依赖目录
+node_modules/
+.pnpm-store/
+.npm/
+web_modules/
+
+# 编辑器和IDE相关
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.sublime-project
+*.sublime-workspace
+.atom/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+.suo
+.ntvs*
+.njsproj
+.sln
+.sw?
+.DS_Store
+*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.iml
+.cursor/
+
+# 构建输出
+dist/
+dist-ssr/
+dist.zip
+*.tgz
+.output/
+
+# 临时文件
+.temp/
+.tmp/
+.cache/
+tmp/
+temp/
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# 前端Vite项目忽略规则
+####################
+
+# 自动生成的类型文件
+auto-imports.d.ts
+components.d.ts
+
+# 编译产物
+vite/dist/
+vite/dist.zip
+vite/*.local
+
+# 环境变量文件
+.env
+.env.*
+!.env.example
+
+# Capacitor/安卓相关忽略规则
+###########################
+
+# 安卓构建相关
+vite/android/.gradle/
+vite/android/build/
+vite/android/app/build/
+vite/android/customApkOutput/
+vite/android/app/release/
+vite/android/app/debug/
+vite/android/app/outputs/
+vite/android/captures/
+vite/android/capacitor-cordova-android-plugins/build/
+vite/android/.externalNativeBuild/
+vite/android/.cxx/
+
+# Capacitor生成的资源
+vite/android/app/src/main/assets/public/
+
+
+
+# Gradle包装器生成文件
+vite/android/.gradle/
+vite/android/gradle/wrapper/gradle-wrapper.jar
+
+# 安卓APK和Bundle文件
+
+*.aab
+*.ap_
+*.aar
+
+# 后端API项目忽略规则
+###################
+
+# Java/Spring相关
+mine-api/target/
+mine-api/build/
+mine-api/*.jar
+mine-api/*.war
+mine-api/out/
+mine-api/!**/src/main/**/out/
+mine-api/!**/src/test/**/out/
+mine-api/*.class
+mine-api/hs_err_pid*
+mine-api/.mvn/wrapper/maven-wrapper.jar
+
+
+
+# 数据库和缓存
+*.db
+*.sqlite
+*.sqlite3
+*.h2.db
+*.mv.db
+
+# 备份文件
+*~
+*.bak
+*.swp
+*.orig 
