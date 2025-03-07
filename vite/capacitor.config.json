@@ -1,0 +1,49 @@
+{
+  "appId": "com.example.myappnew",
+  "appName": "配送系统",
+  "webDir": "C:\\Users\\g\\Desktop\\代码\\demo\\vite\\dist",
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "version": "1.0.0"
+    },
+    "BluetoothLe": {
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION"
+      ]
+    }
+  },
+  "android": {
+    "logLevel": "error",
+    "minSdkVersion": 35,
+    "plugins": {
+      "Permissions": {
+        "bluetooth": true,
+        "bluetoothConnect": true,
+        "bluetoothScan": true
+      }
+    },
+    "permissions": [
+      "android.permission.BLUETOOTH",
+      "android.permission.BLUETOOTH_ADMIN",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.BLUETOOTH_SCAN",
+      "android.permission.BLUETOOTH_CONNECT"
+    ],
+    "allowMixedContent": true,
+    "networkSecurityConfig": {
+      "base-config": {
+        "cleartextTrafficPermitted": true
+      }
+    }
+  },
+  "server": {
+    "cleartext": true
+  }
+}
+

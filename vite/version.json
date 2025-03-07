@@ -1,0 +1,7 @@
+{
+  "changelog": "优化打印功能",
+  "version": "1.2.2",
+  "url": "http://update.abocidee.com/updates/dist.zip",
+  "forceDownloadApk": true,
+  "apkUrl": "http://update.abocidee.com/updates/app-release.apk"
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- app_name 由 build.gradle 文件中的 resValue 动态定义，区分测试版和正式版 -->
+    <string name="title_activity_main">商家配送系统</string>
+    <string name="package_name">com.example.myappndefined</string>
+    <string name="custom_url_scheme">com.example.myappndefined</string>
+</resources>

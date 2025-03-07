@@ -1,0 +1,48 @@
+# 忽略所有构建生成的文件和目录
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+
+# 忽略本地配置文件
+android/local.properties
+
+# 忽略IDE生成的文件
+.idea/
+.vscode/
+dist/
+
+
+# 忽略包管理器生成的文件
+package-lock.json
+yarn.lock
+
+# 忽略日志文件
+*.log
+
+# 忽略临时文件
+*.tmp
+*.swp
+
+# 忽略测试报告
+android/app/build/reports/
+
+# 忽略缓存文件
+node_modules/
+.gradle/
+
+# 忽略系统文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 忽略其他特定文件
+*.DS_Store
+*.class
+*.jar
+
+# 忽略zip包
+*.zip
+
+# 忽略其他不需要的文件
+*.bak
+*.old
+*.backup
