@@ -29,6 +29,7 @@
                       <th>过期日期</th>
                       <th>库存数量</th>
                       <th>库存金额</th>
+                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -38,6 +39,11 @@
                       <td>{{ formatDate(batch.expirationDate) }}</td>
                       <td class="text-right">{{ batch.quantity }}</td>
                       <td class="text-right">{{ formatAmount(batch) }}</td>
+                      <td>
+                        <el-button type="primary" size="small" @click="openEditDialog(batch, row.id.split('-')[0])">
+                          修改库存
+                        </el-button>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -62,17 +68,90 @@
             {{ formatAmount(row) }}
           </template>
         </el-table-column>
+        <el-table-column label="操作" width="120">
+          <template #default="{ row }">
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="openEditDialog(row)" 
+              v-if="!row.children">
+              修改库存
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
+
+    <!-- Vant移动端库存修改弹窗 -->
+    <van-dialog
+      v-model:show="editDialogVisible"
+      title="修改库存"
+      :show-confirm-button="false"
+      close-on-click-overlay
+      :style="{ width: '90%', maxWidth: '500px' }"
+    >
+      <van-form @submit="submitInventoryUpdate">
+        <van-cell-group inset>
+          <van-field
+            label="产品名称"
+            :model-value="editForm.productName"
+            readonly
+            label-width="80px"
+          />
+          <van-field
+            v-if="editForm.batchNumber !== undefined"
+            label="批次号"
+            :model-value="editForm.batchNumber"
+            readonly
+            label-width="80px"
+          />
+          <van-field
+            name="quantity"
+            label="库存数量"
+            label-width="80px"
+            required
+          >
+            <template #input>
+              <van-stepper
+                v-model="editForm.quantity"
+                :min="0"
+                integer
+                input-width="70px"
+                button-size="28px"
+              />
+            </template>
+          </van-field>
+        </van-cell-group>
+        <div class="dialog-footer">
+          <van-button round block type="primary" native-type="submit" class="submit-btn">确认修改</van-button>
+          <van-button round block plain @click="editDialogVisible = false" class="cancel-btn">取消</van-button>
+        </div>
+      </van-form>
+    </van-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import api from "@/api/index.js";
+import { ElMessage } from 'element-plus';
+import { showToast } from 'vant';
+import 'vant/lib/index.css';
 
 const tableRef = ref(null);
 const isExpandAll = ref(false);
+const editDialogVisible = ref(false);
+const editFormRef = ref(null);
+
+// 编辑表单数据
+const editForm = ref({
+  id: null,
+  productId: null,
+  batchId: null,
+  quantity: 0,
+  productName: '',
+  batchNumber: undefined
+});
 
 // 表格数据
 const tableData = ref([]);
@@ -112,7 +191,8 @@ const processedTableData = computed(() => {
           productionDate: batch.productionDate,
           expirationDate: batch.expirationDate,
           quantity: batch.quantity || 0,
-          amount: (product.costPrice || 0) * (batch.quantity || 0)
+          amount: (product.costPrice || 0) * (batch.quantity || 0),
+          batchId: batch.batchId
         }))
       });
     } else {
@@ -213,6 +293,66 @@ const toggleExpand = () => {
 // 定义行的类名
 const getRowClassName = ({ row }) => {
   return row.batchManaged ? 'row-batch-managed' : 'row-no-batch';
+};
+
+// 打开编辑对话框
+const openEditDialog = (row, productId = null) => {
+  // 如果是批次项
+  if (row.batchId) {
+    editForm.value = {
+      productId: parseInt(productId),
+      batchId: row.batchId,
+      quantity: row.quantity,
+      productName: tableData.value.find(p => p.id == productId)?.name || '',
+      batchNumber: row.batchNumber || '无批次'
+    };
+  } else {
+    // 非批次管理的产品
+    editForm.value = {
+      productId: parseInt(row.id),
+      batchId: null,
+      quantity: row.quantity,
+      productName: row.name,
+      batchNumber: undefined
+    };
+  }
+  
+  editDialogVisible.value = true;
+};
+
+// 提交库存更新
+const submitInventoryUpdate = async () => {
+  try {
+    // 构建更新数据
+    const updateData = [{
+      productId: editForm.value.productId,
+      batchId: editForm.value.batchId,
+      quantity: editForm.value.quantity
+    }];
+    
+    // 调用API更新库存
+    await api.inventory.batchUpdate(updateData);
+    
+    // 关闭对话框
+    editDialogVisible.value = false;
+    
+    // 重新加载数据
+    await getInventoryList();
+    
+    // 使用Vant的Toast替代ElementUI的Message
+    showToast({
+      message: '库存更新成功',
+      type: 'success',
+      position: 'top'
+    });
+  } catch (error) {
+    console.error('更新库存失败:', error);
+    showToast({
+      message: '更新库存失败: ' + (error.message || '未知错误'),
+      type: 'fail',
+      position: 'top'
+    });
+  }
 };
 
 // 初始化
@@ -387,5 +527,34 @@ onMounted(() => {
 .table-wrapper::-webkit-scrollbar-track,
 .batch-table-container::-webkit-scrollbar-track {
   background: #f5f7fa;
+}
+
+/* Vant弹窗样式 */
+.dialog-footer {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.submit-btn {
+  margin-bottom: 10px;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  :deep(.van-dialog) {
+    width: 90% !important;
+    max-width: none !important;
+    border-radius: 12px;
+  }
+  
+  :deep(.van-cell-group--inset) {
+    margin: 0;
+  }
+  
+  :deep(.van-field__label) {
+    width: 80px !important;
+  }
 }
 </style>

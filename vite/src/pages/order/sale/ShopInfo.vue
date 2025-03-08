@@ -22,11 +22,20 @@
           </div>
         </div>
 
-        <div class="info-item">
-          <van-icon name="info-o"/>
-          <span>{{ currentShop?.notice || '欢迎光临，请尽情选购' }}</span>
-        </div>
       </div>
+    </div>
+    
+    <!-- 修改查看历史订单按钮 -->
+    <div class="shop-actions" v-if="currentShop?.id">
+      <van-button 
+        size="small" 
+        type="primary" 
+        icon="orders-o" 
+        class="history-order-btn"
+        @click.stop="showHistoryOrders"
+      >
+        查看历史订单
+      </van-button>
     </div>
   </div>
 
@@ -47,25 +56,65 @@
       </van-tab>
     </van-tabs>
   </van-popup>
+
+  <!-- 添加商家历史订单弹窗 -->
+  <van-popup
+    v-model:show="showHistoryOrdersPopup"
+    position="bottom"
+    :style="{ height: '80%' }"
+    :z-index="3000"
+    :overlay-style="{ zIndex: 2900 }"
+  >
+    <van-nav-bar 
+      left-text="返回" 
+      title="历史销售订单" 
+      @click-left="showHistoryOrdersPopup = false"
+    />
+    <div class="history-orders-container">
+      <SalesOrderList 
+        ref="historyOrdersListRef"
+        :shop-id="currentShop?.id"
+        :custom-mode="true"
+      />
+    </div>
+  </van-popup>
 </template>
 
 <script setup>
 import {useOrderStore} from '@/stores/order'
 import {storeToRefs} from 'pinia'
-import {ref} from 'vue'
+import {ref, onMounted} from 'vue'
 import ShopListItem from '@/components/Shop/ShopListItem.vue'
 import NearShopList from "@/components/Shop/nearShopList.vue";
+import SalesOrderList from "@/components/Order/SalesOrderList.vue";
 
 const store = useOrderStore()
 const {currentShop} = storeToRefs(store)
 const showPicker = ref(false)
 const active = ref(0);
+// 新增历史订单弹窗状态
+const showHistoryOrdersPopup = ref(false)
+// 添加组件引用
+const historyOrdersListRef = ref(null)
 
 const receiveDataFromChild = (data) => {
   currentShop.value = data
   showPicker.value = false
   // 处理从子组件传来的数据
   console.log(data)
+}
+
+// 添加显示历史订单的方法
+const showHistoryOrders = () => {
+  if (currentShop.value?.id) {
+    showHistoryOrdersPopup.value = true
+    // 使用setTimeout确保DOM更新后再访问组件实例
+    setTimeout(() => {
+      if (historyOrdersListRef.value && historyOrdersListRef.value.resetAndLoad) {
+        historyOrdersListRef.value.resetAndLoad()
+      }
+    }, 100)
+  }
 }
 </script>
 
@@ -122,6 +171,27 @@ const receiveDataFromChild = (data) => {
   flex-shrink: 0;
 }
 
+/* 新增历史订单按钮样式 */
+.shop-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 16px 10px;
+  width: 100%;
+  box-sizing: border-box; /* 确保padding不会增加元素总宽度 */
+}
+
+.history-order-btn {
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* 历史订单容器样式 */
+.history-orders-container {
+  height: calc(100% - 44px);
+  overflow-y: auto;
+}
+
 /* 响应式调整 */
 @media (max-width: 375px) {
   .shop-info {
@@ -142,6 +212,16 @@ const receiveDataFromChild = (data) => {
   
   .info-item .van-icon {
     font-size: 14px;
+  }
+  
+  /* 添加小屏幕下按钮的样式 */
+  .shop-actions {
+    padding: 0 12px 8px;
+  }
+  
+  .history-order-btn {
+    font-size: 12px;
+    padding: 0 10px;
   }
 }
 

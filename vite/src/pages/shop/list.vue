@@ -53,6 +53,11 @@ export default {
     onClickLeft(){
       this.$router.go(-1);
     },
+    onClickRight(){
+      this.$router.push({
+        path: '/shop/create',
+      })
+    }
 
   },
 
