@@ -4,9 +4,9 @@ import 'vant/es/toast/style';
 import 'vant/es/dialog/style';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { FileOpener } from '@capacitor-community/file-opener';
-import { APP_VERSION } from '@/config/version.js'
-import { ref } from 'vue';
 
+import { ref } from 'vue';
+import APP_VERSION from '@/../version.json'
 /**
  * 应用更新组合式函数
  * 提供检查更新和下载APK的功能
@@ -19,6 +19,8 @@ export function useAppUpdate() {
    */
   async function checkForUpdates() {
     if (isChecking.value) return;
+
+
 
     isChecking.value = true;
     try {

@@ -92,6 +92,14 @@ export default {
     selectionMode: {
       type: Boolean,
       default: false
+    },
+    customMode: {
+      type: Boolean,
+      default: false
+    },
+    shopId: {
+      type: [String, Number],
+      default: null
     }
   },
   emits: ['order-selected'],
@@ -122,8 +130,7 @@ export default {
           callback: () => this.handleDeleteOrder(this.selectedOrder.id)
         }
       ],
-      selectedOrders: [], // 多选模式下选中的订单
-      // 筛选条件
+      selectedOrders: [],
       filterParams: {
         shopId: null,
         startDate: null,
@@ -132,10 +139,23 @@ export default {
     }
   },
   mounted() {
-    // 从路由中获取筛选参数
-    this.filterParams.shopId = this.$route.query.shopId || null;
-    this.filterParams.startDate = this.$route.query.startDate || null;
-    this.filterParams.endDate = this.$route.query.endDate || null;
+    if (this.shopId) {
+      this.filterParams.shopId = this.shopId;
+    } else if (!this.customMode) {
+      this.filterParams.shopId = this.$route.query.shopId || null;
+      this.filterParams.startDate = this.$route.query.startDate || null;
+      this.filterParams.endDate = this.$route.query.endDate || null;
+    }
+  },
+  watch: {
+    shopId: {
+      handler(newVal) {
+        if (newVal) {
+          this.filterParams.shopId = newVal;
+          this.resetAndLoad();
+        }
+      }
+    }
   },
   methods: {
     openActionSheet(order) {
@@ -145,12 +165,11 @@ export default {
     async handlePrintOrder() {
       try {
         await printOrder(this.selectedOrder, (status) => {
-          console.log(status); // 或者更新UI显示状态
+          console.log(status);
         });
       } catch (error) {
         console.error('打印失败', error);
       }
-
     },
     async handleCopyOrder(order) {
       try {
@@ -200,13 +219,15 @@ export default {
         this.loading = false;
       }
     },
-    
-    // 判断订单是否被选中
+    resetAndLoad() {
+      this.orders = [];
+      this.pageIndex = 0;
+      this.finished = false;
+      this.onLoad();
+    },
     isOrderSelected(order) {
       return this.selectedOrders.some(item => item.id === order.id);
     },
-    
-    // 切换订单选中状态
     toggleOrderSelection(order, selected) {
       if (selected) {
         this.selectedOrders.push(order);
@@ -214,11 +235,8 @@ export default {
         this.selectedOrders = this.selectedOrders.filter(item => item.id !== order.id);
       }
       
-      // 触发事件通知父组件
       this.$emit('order-selected', order, selected);
     },
-    
-    // 清除选择状态
     clearSelection() {
       this.selectedOrders = [];
     }

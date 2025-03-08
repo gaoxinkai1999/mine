@@ -5,8 +5,8 @@
       <div class="header-content">
         <h1 class="title">门店配送系统</h1>
         <div class="version-info">
-          <span class="version">v{{ version }}</span>
-          <span class="changelog" v-if="changelog">{{ changelog }}</span>
+          <h3 class="version">v{{ version }}</h3>
+          <span class="changelog" v-if="changelog">更新日志{{ changelog }}</span>
         </div>
       </div>
     </header>
@@ -44,7 +44,7 @@
 
 <script>
 import { ref, onMounted } from 'vue';
-import {APP_VERSION} from "@/config/version.js";
+import APP_VERSION from '@/../version.json'
 
 export default {
   name: 'HomePage',
@@ -64,6 +64,7 @@ export default {
     
     onMounted(() => {
       // 可以在这里获取版本信息和更新日志
+      console.log('当前版本日志：', changelog)
     });
     
     return {
@@ -118,6 +119,7 @@ export default {
   margin-top: 8px;
   font-size: 14px;
   opacity: 0.9;
+  white-space: pre-line;
 }
 
 .version {

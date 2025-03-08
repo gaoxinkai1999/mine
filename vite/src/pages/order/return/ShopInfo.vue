@@ -22,10 +22,6 @@
           </div>
         </div>
 
-        <div class="info-item">
-          <van-icon name="info-o"/>
-          <span>{{ currentShop?.notice || '欢迎办理退货业务' }}</span>
-        </div>
       </div>
     </div>
   </div>

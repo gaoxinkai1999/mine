@@ -26,6 +26,6 @@ public class ProductDto implements Serializable {
     private Integer categoryId;
     private int sort;
     private boolean isBatchManaged;
-    private  ProductStockDTO productStockDTO;
+
 
 }

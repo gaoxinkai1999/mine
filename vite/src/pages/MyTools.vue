@@ -5,7 +5,7 @@
     <div class="tool-groups">
       <ToolGroup title="商家" :items="shopItems" />
       <ToolGroup title="商品" :items="productItems" />
-      <ToolGroup title="订单" :items="orderItems" />
+<!--      <ToolGroup title="订单" :items="orderItems" />-->
 <!--      <ToolGroup title="采购" :items="purchaseItems" />-->
       <ToolGroup title="销售数据" :items="salesDataItems" />
     </div>
@@ -37,17 +37,16 @@ export default {
         { title: "库存管理", to: "product/inventory" },
         { title: "价格规则", to: "PriceRule" }
       ],
-      orderItems: [
-        { title: "订单总览", to: "order/list" }
-      ],
-      purchaseItems: [
-        { title: "采购记录", to: "StockInData" },
-        { title: "采购计算器", to: "InventoryPurchaseCalculator" }
-      ],
+      // orderItems: [
+      //   { title: "订单总览", to: "order/list" }
+      // ],
+      // purchaseItems: [
+      //   { title: "采购记录", to: "StockInData" },
+      //   { title: "采购计算器", to: "InventoryPurchaseCalculator" }
+      // ],
       salesDataItems: [
-        { title: "月销售数据", to: "MonthData" },
-        { title: "商品销售数据", to: "ProductChart" },
-        { title: "每日销售数据", to: "DailyData" }
+        { title: "月销售数据", to: "statistics/MonthData" },
+        { title: "每日销售数据", to: "statistics/DailyData" }
       ]
     }
   }

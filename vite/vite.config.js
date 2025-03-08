@@ -22,25 +22,6 @@ export default defineConfig({
         Components({
             resolvers: [VantResolver(), ElementPlusResolver()], // 自动引入 Vant 组件
         }),
-        {
-            name: 'version-update',
-            buildStart() {
-                // 读取 package.json 中的版本号
-                const pkg = JSON.parse(fs.readFileSync('./version.json', 'utf-8'));
-
-                // 更新版本配置文件
-                const versionConfig = `
-          export const APP_VERSION = {
-            version: '${pkg.version}',
-            buildDate: '${new Date().toISOString()}',
-            changelog:'${pkg.changelog}'
-          };
-        `;
-
-                fs.writeFileSync('./src/config/version.js', versionConfig);
-            }
-        }
-
     ],
     /**
      * idea不能识别

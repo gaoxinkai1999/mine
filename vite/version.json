@@ -1,6 +1,6 @@
 {
-  "changelog": "优化打印功能",
-  "version": "1.2.2",
+  "changelog": "\n1.解决复制到剪切板的bug\n 2.新增新建订单时查看商家历史订单的功能\n3.日统计和月统计实现",
+  "version": "1.2.3",
   "url": "http://update.abocidee.com/updates/dist.zip",
   "forceDownloadApk": true,
   "apkUrl": "http://update.abocidee.com/updates/app-release.apk"
