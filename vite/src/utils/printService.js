@@ -485,7 +485,7 @@ function addHeader(shop, isPrinting, title = null) {
     // 添加店名和电话
     if (isPrinting) {
         header += formatText("清徐欣凯副食经销", { size: 6, bold: true }) + "\n";
-        header += formatText("电话: 13912345678\n\n", { size: 0 });
+        header += formatText("电话: 15698338631\n\n", { size: 0 });
         header += formatText(shop.name, { size: 3, bold: true }) + "\n\n";
         if (title) {
             header += formatText(title, { size: 3, bold: true }) + "\n\n";
@@ -493,7 +493,7 @@ function addHeader(shop, isPrinting, title = null) {
     } else {
         // 非打印模式下使用纯文本
         header += "清徐欣凯副食经销\n";
-        header += "电话: 13912345678\n\n";
+        header += "电话: 15698338631\n\n";
         header += `${shop.name}\n\n`;
         if (title) {
             header += `${title}\n\n`;
