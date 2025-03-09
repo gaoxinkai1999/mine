@@ -1,7 +1,6 @@
 package com.example.domain.inventory.controller;
 
 import com.example.domain.inventory.dto.InventoryUpdateDto;
-import com.example.domain.inventory.mapper.InventoryMapper;
 import com.example.domain.inventory.service.InventoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,8 +9,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * 库存控制器
@@ -24,18 +21,18 @@ public class InventoryController {
 
     @Autowired
     private InventoryService inventoryService;
-    @Autowired
-    private InventoryMapper inventoryMapper;
+
 
     /**
-     * 批量更新库存信息
+     * 更新库存信息
      *
-     * @param inventories 库存更新信息列表
+     * @param inventoryUpdateDto 库存更新信息
      */
-    @Operation(summary = "批量更新库存信息", description = "根据提供的库存信息进行批量更新，包括产品关联和批次关联")
-    @PostMapping("/batch-update")
-    public void batchUpdate(@RequestBody List<InventoryUpdateDto> inventories) {
-        inventoryService.batchUpdate(inventories);
+    @Operation(summary = "修改库存", description = "根据提供的库存信息进行更新")
+    @PostMapping("/update")
+    public void update(@RequestBody InventoryUpdateDto inventoryUpdateDto) {
+        inventoryService.update(inventoryUpdateDto);
+
     }
 
 

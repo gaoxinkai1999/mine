@@ -324,14 +324,15 @@ const openEditDialog = (row, productId = null) => {
 const submitInventoryUpdate = async () => {
   try {
     // 构建更新数据
-    const updateData = [{
+    const updateData = {
       productId: editForm.value.productId,
       batchId: editForm.value.batchId,
       quantity: editForm.value.quantity
-    }];
-    
+    };
+
+    console.log('提交库存更新数据:', updateData)
     // 调用API更新库存
-    await api.inventory.batchUpdate(updateData);
+    await api.inventory.update(updateData);
     
     // 关闭对话框
     editDialogVisible.value = false;

@@ -21,7 +21,7 @@ spring:
         format_sql: true
     #        enable_lazy_load_no_trans: false
     #    控制台打印jpa执行的sql
-    show-sql: true
+    show-sql: false
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver

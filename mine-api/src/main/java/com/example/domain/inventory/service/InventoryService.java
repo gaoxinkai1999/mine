@@ -21,6 +21,7 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,7 @@ import java.util.Set;
  * {@link Inventory}
  */
 @Service
+@Slf4j
 public class InventoryService implements BaseRepository<Inventory, InventoryQuery> {
 
     @Autowired
@@ -97,17 +99,14 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
 
 
     @Transactional
-    public void batchUpdate(List<InventoryUpdateDto> inventories) {
-        for (InventoryUpdateDto inventoryUpdateDto : inventories) {
-            Inventory inventory = this.findOne(InventoryQuery.builder()
-                    .Id(inventoryUpdateDto.getId())
-                    .includes(Set.of(InventoryQuery.Include.PRODUCT, InventoryQuery.Include.BATCH))
-                    .build())
-                    .orElseThrow(() -> new MyException("库存记录不存在: " + inventoryUpdateDto.getId()));
-
-            Inventory update = inventoryMapper.partialUpdate(inventoryUpdateDto, inventory);
-            inventoryRepository.save(update);
-        }
+    public void update(InventoryUpdateDto inventoryUpdateDto) {
+        log.info("更新库存: {}", inventoryUpdateDto);
+        Inventory inventory = findOne(InventoryQuery.builder()
+                                                    .productId(inventoryUpdateDto.getProductId())
+                                                    .batchId(inventoryUpdateDto.getBatchId())
+                                                    .build()).orElseThrow();
+        inventory.setQuantity(inventoryUpdateDto.getQuantity());
+        inventoryRepository.save(inventory);
     }
 
     /**
