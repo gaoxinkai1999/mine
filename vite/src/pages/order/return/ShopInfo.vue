@@ -36,7 +36,7 @@
     <van-nav-bar left-text="关闭" title="选择退货商家" @click-left="showPicker=false"/>
     <van-tabs v-model:active="active">
       <van-tab title="附近商家">
-        <nearShopList @selectShop="receiveDataFromChild"></nearShopList>
+        <nearShopList @selectShop="receiveDataFromChild" :nearby-shops="nearbyShops"></nearShopList>
       </van-tab>
       <van-tab title="全部商家">
         <ShopListItem @selectShop="receiveDataFromChild"></ShopListItem>
@@ -151,9 +151,20 @@ const currentShop = computed(() => {
   flex-direction: column;
 }
 
+:deep(.van-tabs) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+:deep(.van-tabs__wrap) {
+  flex-shrink: 0;
+}
+
 :deep(.van-tabs__content) {
   flex: 1;
   overflow-y: auto;
+  height: 100%;
 }
 
 :deep(.van-tab) {

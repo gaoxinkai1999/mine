@@ -8,11 +8,14 @@
 
 </template>
 <script setup>
-import {useReturnOrderStore} from "@/stores/returnOrder.js";
-import {storeToRefs} from "pinia";
+const props = defineProps({
+  nearbyShops: {
+    type: Array,
+    required: true
+  }
+})
 
-const returnOrderStore = useReturnOrderStore();
-const {nearbyShops} = storeToRefs(returnOrderStore);
+
 
 // 定义可触发的事件
 const emit = defineEmits(['selectShop']);

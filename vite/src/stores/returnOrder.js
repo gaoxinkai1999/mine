@@ -96,11 +96,12 @@ export const useReturnOrderStore = defineStore('returnOrder', () => {
      * 2. 获取默认选中商铺的详细信息
      */
     async function getNearbyShops() {
+
         try {
             const result = await locationService.getNearbyShops();
             currentLocation.value = result.currentLocation;
             nearbyShops.value = result.nearbyShops;
-
+            console.log('获取位置信息成功', nearbyShops.value.length)
         } catch (error) {
             console.error('获取位置信息失败:', error);
         } finally {

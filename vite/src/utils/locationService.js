@@ -35,7 +35,7 @@ export default {
 
             return {
                 currentLocation: complexData.currentLocation,
-                nearbyShops: result.shops.slice(0, 5)
+                nearbyShops: result.shops.slice(0, 10)
             };
         } catch (error) {
             console.error('获取附近商店失败:', error);

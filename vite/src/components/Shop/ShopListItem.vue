@@ -142,7 +142,7 @@ export default {
       this.UseSearch = true
     },
     onCancel() {
-      this.getShops()
+      this.fetchShopData()
       this.UseSearch = false
     },
 
