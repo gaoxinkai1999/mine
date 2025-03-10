@@ -24,7 +24,6 @@ public interface BaseRepository<T, Q extends BaseQuery> {
     default Slice<T> findPage(Q query, Pageable pageable) {
         JPAQuery<T> jpaQuery = buildBaseQuery(query);
 
-
         // 执行分页查询
         List<T> content = jpaQuery
                 .offset(pageable.getOffset())
