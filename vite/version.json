@@ -1,6 +1,6 @@
 {
   "changelog": "修复删除订单bug",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "url": "http://update.abocidee.com/updates/dist.zip",
   "forceDownloadApk": true,
   "apkUrl": "http://update.abocidee.com/updates/app-release.apk"

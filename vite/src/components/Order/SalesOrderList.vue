@@ -188,7 +188,8 @@ export default {
         title: '确认删除',
         message: '确定要删除这个订单吗？'
       }).then(() => {
-        api.order.cancelOrder(id).then(() => {
+        api.order.cancelOrder({orderId: id}).then(() => {
+          showSuccessToast('删除成功')
           this.orders = this.orders.filter(item => item.id !== id);
         })
       })
