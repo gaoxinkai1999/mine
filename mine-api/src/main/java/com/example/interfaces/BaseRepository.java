@@ -8,21 +8,42 @@ import org.springframework.data.domain.SliceImpl;
 import java.util.List;
 import java.util.Optional;
 
-// 2. 基础Repository接口
+/**
+ * 基础Repository接口
+ * 
+ * @param <T> 实体类型
+ * @param <Q> 查询条件类型
+ */
 public interface BaseRepository<T, Q extends BaseQuery> {
-    // 提供默认实现
+
+    /**
+     * 查询单个结果
+     * @param query 查询条件
+     * @return Optional包装的查询结果
+     */
     default Optional<T> findOne(Q query) {
         return Optional.ofNullable(buildBaseQuery(query).fetchOne());
     }
 
+    /**
+     * 查询列表结果
+     * @param query 查询条件
+     * @return 查询结果列表
+     */
     default List<T> findList(Q query) {
         JPAQuery<T> jpaQuery = buildBaseQuery(query);
         return jpaQuery.fetch();
     }
 
-    // 分页查询
+    /**
+     * 分页查询
+     * @param query 查询条件
+     * @param pageable 分页参数
+     * @return 分页结果
+     */
     default Slice<T> findPage(Q query, Pageable pageable) {
         JPAQuery<T> jpaQuery = buildBaseQuery(query);
+        
         // 执行分页查询
         List<T> content = jpaQuery
                 .offset(pageable.getOffset())
@@ -37,6 +58,11 @@ public interface BaseRepository<T, Q extends BaseQuery> {
         return new SliceImpl<>(content, pageable, hasNext);
     }
 
+    /**
+     * 构建基础查询
+     * @param query 查询条件
+     * @return JPAQuery对象
+     */
     JPAQuery<T> buildBaseQuery(Q query);
 
 
