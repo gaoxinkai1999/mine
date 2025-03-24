@@ -20,9 +20,13 @@ import com.example.query.OrderQuery;
 import com.example.query.ProductQuery;
 import com.example.query.ShopQuery;
 import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,6 +80,9 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
         JPAQuery<Order> jpaQuery = queryFactory
                 .selectFrom(qOrder)
                 .distinct();
+
+
+
 
         // 处理关联
         // 如果查询参数中包含店铺信息，则左连接店铺表，并根据条件进一步连接价格规则表
@@ -131,6 +138,89 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                        .orderBy(qOrder.createTime.desc());
     }
 
+
+    @Override
+    public Slice<Order> findPage(OrderQuery query, Pageable pageable){
+        QOrder qOrder = QOrder.order; // 查询订单的QueryDSL对象
+        QOrderDetail qOrderDetail = QOrderDetail.orderDetail; // 查询订单详情的QueryDSL对象
+        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
+        QShop qShop = QShop.shop; // 查询商店的QueryDSL对象
+        QPriceRule qPriceRule = QPriceRule.priceRule; // 查询价格规则的QueryDSL对象
+
+        // 初始化查询对象
+        JPAQuery<Integer> jpaQuery = queryFactory
+                .select(qOrder.id)
+                .from(qOrder);
+
+        BooleanExpression eq = qShop.id.eq(qOrder.shop.id);
+
+        // 处理查询条件
+        // 根据查询参数构建where条件，以精确查询
+        BooleanBuilder where = new BooleanBuilder();
+        // 如果查询参数中包含订单ID，则添加ID查询条件
+        if (query.getId() != null) {
+            where.and(qOrder.id.eq(query.getId()));
+        }
+
+        // 如果查询参数中包含开始时间和结束时间，则添加时间区间查询条件
+        if (query.getStartTime() != null && query.getEndTime() != null) {
+            where.and(qOrder.createTime.between(
+                    query.getStartTime()
+                         .atStartOfDay(),
+                    query.getEndTime()
+                         .atTime(23, 59, 59)
+            ));
+        }
+
+        // 如果查询参数中包含店铺ID，则添加店铺ID查询条件
+        if (query.getShopId() != null) {
+            where.and(qOrder.shop.id.eq(query.getShopId()));
+        }
+
+        // 执行分页查询
+        List<Integer> content = jpaQuery.where(where).orderBy(qOrder.createTime.desc())
+                                        .offset(pageable.getOffset())
+                                        .limit(pageable.getPageSize() + 1)
+                                        .fetch();
+
+        boolean hasNext = content.size() > pageable.getPageSize();
+        if (hasNext) {
+            content.removeLast();
+        }
+        JPAQuery<Order> jpaQueryEntity = queryFactory
+                .selectFrom(qOrder)
+                .where(qOrder.id.in(content)).orderBy(qOrder.createTime.desc());
+        // 处理关联
+        // 如果查询参数中包含店铺信息，则左连接店铺表，并根据条件进一步连接价格规则表
+
+        if (query.getIncludes()
+                 .contains(OrderQuery.Include.SHOP)) {
+            jpaQueryEntity.leftJoin(qOrder.shop, qShop)
+                    .fetchJoin();
+            if (query.getIncludes()
+                     .contains(OrderQuery.Include.PRICE_RULE)) {
+                jpaQueryEntity.leftJoin(qShop.priceRule, qPriceRule)
+                        .fetchJoin();
+            }
+        }
+
+        // 如果查询参数中包含订单详情，则左连接订单详情表，并根据条件进一步连接产品表
+        if (query.getIncludes()
+                 .contains(OrderQuery.Include.DETAILS)) {
+            jpaQueryEntity.leftJoin(qOrder.orderDetails, qOrderDetail)
+                    .fetchJoin();
+
+            if (query.getIncludes()
+                     .contains(OrderQuery.Include.PRODUCT)) {
+                jpaQueryEntity.leftJoin(qOrderDetail.product, qProduct)
+                        .fetchJoin();
+            }
+        }
+        List<Order> orders = jpaQueryEntity.fetch();
+
+
+        return new SliceImpl<>(orders, pageable, hasNext);
+    }
     /**
      * 创建新订单
      *

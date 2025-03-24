@@ -474,37 +474,6 @@ public class StatisticsService {
         return dailySales;
     }
 
-    /**
-     * 获取指定商品ID从最早销售时间到今天的每天销售数量
-     *
-     * @param productId 商品ID
-     * @return 每天销售数量的列表
-     */
-    public List<Map<String, Object>> getDailySalesByProductId(int productId) {
-        // 获取该商品的最早销售日期
 
-        LocalDate startDate = productService.getEarliestSaleDateByProductId(productId);
-        LocalDate endDate = LocalDate.now();
-
-        // 获取指定日期范围内的销售统计
-        Map<LocalDate, SalesStatisticsDTO> dailyStatistics = calculateDailyStatistics(startDate, endDate);
-
-        // 格式化结果
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (LocalDate date : dailyStatistics.keySet()) {
-            SalesStatisticsDTO stats = dailyStatistics.get(date);
-            int salesQuantity = stats.getProductSalesInfoDTOS().stream()
-                    .filter(product -> product.getProductId() == productId)
-                    .mapToInt(ProductSalesInfoDTO::getQuantity)
-                    .sum();
-
-            Map<String, Object> entry = new HashMap<>();
-            entry.put("ds", date.toString());
-            entry.put("y", salesQuantity);
-            result.add(entry);
-        }
-
-        return result;
-    }
 }
 

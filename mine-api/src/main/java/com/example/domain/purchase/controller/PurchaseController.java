@@ -1,14 +1,14 @@
 package com.example.domain.purchase.controller;
 
+import com.example.domain.product.service.ProductService;
+import com.example.domain.purchase.dto.ProductWithPurchaseInfoDto;
 import com.example.domain.purchase.dto.PurchaseCreateRequest;
 import com.example.domain.purchase.service.PurchaseService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
+import java.util.List;
 
 /**
  * 采购控制器
@@ -20,6 +20,9 @@ public class PurchaseController {
 
     @Autowired
     private PurchaseService purchaseService;
+
+    @Autowired
+    private ProductService productService;
 
     /**
      * 创建采购订单并入库
@@ -44,21 +47,11 @@ public class PurchaseController {
 
     }
 
-    /**
-     * 获取商品采购建议（基于历史平均值）
-     *
-     * @param daysToAnalyze   分析的历史天数，默认为30天
-     * @param leadTimeDays    补货周期天数，默认为7天
-     * @param safetyStockDays 安全库存天数，默认为14天
-     * @return 商品ID到建议采购数量的映射
-     */
-    @GetMapping("/suggestions")
-    @Operation(summary = "获取商品采购建议（基于历史平均值）", description = "基于历史销售数据、当前库存、安全库存水平和补货周期来计算建议采购数量")
-    public Map<Integer, Integer> getPurchaseSuggestions(
-            @Parameter(description = "分析的历史天数") @RequestParam(defaultValue = "30") int daysToAnalyze,
-            @Parameter(description = "补货周期天数") @RequestParam(defaultValue = "7") int leadTimeDays,
-            @Parameter(description = "安全库存天数") @RequestParam(defaultValue = "14") int safetyStockDays) {
-        return purchaseService.generatePurchaseSuggestions(daysToAnalyze, leadTimeDays, safetyStockDays);
+
+    // 获取包含采购信息的在售商品列表
+    @GetMapping("/getOnSaleProductsWithPurchaseInfo")
+    public List<ProductWithPurchaseInfoDto> getOnSaleProductsWithPurchaseInfo() {
+       return purchaseService.getOnSaleProductsWithPurchaseInfo();
     }
 
 

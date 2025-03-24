@@ -10,7 +10,6 @@ import inventoryTransaction from './inventoryTransaction'
 import category from './category'
 import batch from './batch'
 import pricerule from './pricerule'
-import forecast from './forecast'
 
 export default {
   statistics,
@@ -24,6 +23,5 @@ export default {
   inventoryTransaction,
   category,
   batch,
-  pricerule,
-  forecast
+  pricerule
 }

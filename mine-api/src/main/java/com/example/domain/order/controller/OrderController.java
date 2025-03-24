@@ -35,6 +35,8 @@ public class OrderController {
     @Autowired
     private OrderMapper orderMapper;
 
+
+
     /**
      * 查询订单列表，支持分页和筛选
      *
@@ -51,22 +53,24 @@ public class OrderController {
                                      .startTime(request.getStartDate())
                                      .endTime(request.getEndDate())
                                      .shopId(request.getShopId())
-                                     .includes(Set.of(OrderQuery.Include.SHOP, OrderQuery.Include.DETAILS))
+                                     .includes(Set.of(OrderQuery.Include.SHOP, OrderQuery.Include.DETAILS, OrderQuery.Include.PRODUCT))
                                      .build();
 
         Pageable pageable = PageRequest.of(
                 request.getPage(),
                 request.getSize()
         );
-        
+
+
         // 执行分页查询
         Slice<Order> orderSlice = orderService.findPage(query, pageable);
-        
+
         // 转换为DTO并返回
         Slice<OrderDto> dtoSlice = orderSlice.map(orderMapper::toOrderDTO);
-        
+
         return PageResponse.fromSlice(dtoSlice);
     }
+
 
     /**
      * 创建订单

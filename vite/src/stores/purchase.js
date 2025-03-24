@@ -40,7 +40,7 @@ export const usePurchaseStore = defineStore('purchase', () => {
      */
     async function getProducts() {
         try {
-            products.value = await api.product.getProducts()
+            products.value = await api.purchase.getOnSaleProductsWithPurchaseInfo()
         } catch (error) {
             console.error('获取商品列表失败:', error)
             showFailToast('获取商品列表失败')

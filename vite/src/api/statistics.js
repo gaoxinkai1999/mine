@@ -80,20 +80,6 @@ const api = {
       method: 'GET',
       params
     })
-  },
-
-  /**
-   * @description 
-   * @url /statistics/daily-sales/{productId}
-   * @method GET
-   * @param {number} productId 
-   * @returns {Promise<any>}
-   */
-  getDailySales(productId) {
-    return request({
-      url: `/statistics/daily-sales/${productId}`,
-      method: 'GET'
-    })
   }
 }
 

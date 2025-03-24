@@ -1,272 +1,295 @@
 <template>
-  <div class="page">
+  <div class="purchase-page">
     <!-- 顶部导航 -->
-    <van-nav-bar
-      title="新建采购单"
-      left-arrow
-      @click-left="onClickLeft"
-    />
-
-    <div class="content">
-      <!-- 商品清单 -->
-      <van-cell-group title="商品清单" class="purchase-list">
-        <template v-if="purchaseList.length">
-          <van-swipe-cell 
-            v-for="item in purchaseList" 
-            :key="item.productId"
-            class="purchase-item"
-          >
-            <van-cell>
-              <template #title>
-                <div class="product-item">
-                  <div class="product-info">
-                    <span class="product-name">{{ item.productName }}</span>
-                    <span class="product-amount">¥{{ formatAmount(item.totalAmount) }}</span>
-                  </div>
-                  <div class="product-controls">
-                    <van-stepper 
-                      v-model="item.quantity" 
-                      :min="1"
-                      :max="getProductStock(item.productId)"
-                      @change="(value) => updateQuantity(item, value)" 
-                    />
-                    <van-button 
-                      type="danger" 
-                      size="small"
-                      class="delete-btn"
-                      @click="handleDelete(item)"
-                    >删除</van-button>
-                  </div>
-                </div>
-              </template>
-            </van-cell>
-          </van-swipe-cell>
-        </template>
-        
-        <van-empty v-else description="暂无采购商品" />
-      </van-cell-group>
-
-      <!-- 添加商品按钮 -->
-      <van-button 
-        type="primary" 
-        size="large" 
-        icon="plus"
-        class="add-button"
-        @click="showProductSelector = true"
+    <div class="header">
+      <van-nav-bar
+        title="新建采购单"
+        left-arrow
+        right-text="自动生成"
+        fixed
+        placeholder
+        safe-area-inset-top
+        @click-left="handleBack"
+        @click-right="handleRightClick"
       >
-        添加商品
-      </van-button>
+      </van-nav-bar>
+    </div>
 
-      <!-- 合计金额 -->
-      <div v-if="purchaseList.length" class="total-section">
-        <span class="total-label">合计金额</span>
-        <span class="total-amount">¥{{ formatAmount(totalAmount) }}</span>
+    <div class="container">
+      <!-- 商品分类列表 -->
+      <div class="main-content">
+        <van-sidebar v-model="activeCategory">
+          <van-sidebar-item title="全部商品" />
+          <van-sidebar-item 
+            v-for="category in categories" 
+            :key="category.id"
+            :title="category.name"
+          />
+        </van-sidebar>
+        
+        <div class="product-container">
+          <product-list 
+            :products="currentProducts" 
+            :selected-products="purchaseList"
+            @product-selected="handleProductSelected"
+          />
+        </div>
+      </div>
+
+      <!-- 购物车浮动按钮 -->
+      <div class="cart-button" v-show="cartCount > 0" @click="showCartPanel = true">
+        <van-badge :content="cartCount" :max="99">
+          <van-icon name="cart-o" size="24" />
+        </van-badge>
+        <span class="cart-amount">¥{{ formatAmount(totalAmount) }}</span>
       </div>
     </div>
 
-    <!-- 底部提交按钮 -->
-    <div class="footer">
-      <van-button 
-        type="primary" 
-        block 
-        :disabled="!purchaseList.length"
-        @click="handleSubmit"
-      >
-        提交采购单
-      </van-button>
-    </div>
 
-    <!-- 商品选择弹窗 -->
-    <van-popup
-      v-model:show="showProductSelector"
-      position="bottom"
-      :style="{ height: '70%' }"
-      class="product-selector-popup"
-      closeable
-      round
+    <!-- 购物车面板 -->
+    <van-popup 
+      v-model:show="showCartPanel" 
+      position="bottom" 
+      round 
+      class="cart-panel"
     >
-      <div class="product-selector">
-        <div class="selector-header">
-          <span class="selector-title">选择商品</span>
-          <van-search
-            v-model="searchKeyword"
-            placeholder="搜索商品名称"
-            shape="round"
-            @search="onSearch"
-            @clear="onSearchClear"
-          />
-        </div>
+      <div class="cart-header">
+        <div class="cart-title">已选商品</div>
+        <van-button 
+          plain 
+          type="danger" 
+          size="small" 
+          icon="delete" 
+          @click="clearCart"
+        >
+          清空
+        </van-button>
+      </div>
 
-        <div class="selector-content">
-          <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
-            <van-list
-              v-model:loading="loading"
-              :finished="finished"
-              :error="error"
-              error-text="请求失败，点击重试"
-              finished-text="没有更多了"
-              @load="onLoad"
-            >
-              <van-cell
-                v-for="product in filteredProducts"
-                :key="product.id"
-                :class="['product-cell', { selected: isSelected(product.id) }]"
-                @click="quickAdd(product)"
-              >
-                <template #title>
-                  <div class="product-info">
-                    <div class="product-title">
-                      {{ product.name }}
-                      <span class="product-spec">{{ product.specification }}</span>
-                    </div>
-                    <div class="product-detail">
-                      <span class="product-price">¥{{ formatAmount(product.price) }}</span>
-                      <span class="product-stock">库存：{{ product.stock }}</span>
-                    </div>
-                  </div>
-                </template>
-              </van-cell>
-            </van-list>
-          </van-pull-refresh>
+      <div class="cart-items">
+        <van-empty v-if="!purchaseList.length" description="暂无采购商品" />
+        <template v-else>
+          <div
+            v-for="item in purchaseList"
+            :key="item.productId"
+            class="cart-item"
+          >
+            <div class="item-info">
+              <div class="item-name">{{ item.productName }}</div>
+              <div class="item-price">¥{{ formatAmount(item.totalAmount / item.quantity) }} × {{ item.quantity }}</div>
+            </div>
+            <div class="item-actions">
+              <span class="item-total">¥{{ formatAmount(item.totalAmount) }}</span>
+              <van-stepper 
+                v-model="item.quantity" 
+                :min="0" 
+                :max="getProductStock(item.productId)" 
+                theme="round"
+                button-size="22"
+                integer
+                @change="handleStepperChange(item)" 
+              />
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="cart-footer">
+        <div class="cart-total">
+          <span>合计:</span>
+          <span class="cart-total-amount">¥{{ formatAmount(totalAmount) }}</span>
         </div>
+        <van-button
+            type="primary"
+            round
+            :disabled="!purchaseList.length"
+            @click="showBudgetDialog=true"
+        >
+          设置预算
+        </van-button>
+        <van-button 
+          type="primary" 
+
+          round 
+          :disabled="!purchaseList.length"
+          @click="submitOrder"
+        >
+          提交采购单
+        </van-button>
+        <van-dialog v-model:show="showBudgetDialog" title="采购预算" show-cancel-button @confirm="handleAutoSetQuantity">
+          <van-field v-model="budget" type="digit" label="预算 " />
+        </van-dialog>
       </div>
     </van-popup>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { showDialog, showToast } from 'vant'
-import { usePurchaseStore } from '@/stores/purchase'
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { showToast, showDialog } from 'vant';
+import { usePurchaseStore } from '@/stores/purchase';
+import ProductList from '@/components/ProductList.vue';
 
-const router = useRouter()
-const store = usePurchaseStore()
+// 路由与状态
+const router = useRouter();
+const store = usePurchaseStore();
 
-// 状态管理
-const showProductSelector = ref(false)
-const searchKeyword = ref('')
-const loading = ref(false)
-const finished = ref(false)
-const error = ref(false)
-const refreshing = ref(false)
+// 状态
+const activeCategory = ref(0);
+const showFilterPanel = ref(false);
+const showCartPanel = ref(false);
+const sortType = ref('default');
 
 // Store数据
-const products = computed(() => store.products)
-const purchaseList = computed(() => store.purchaseList)
-const totalAmount = computed(() => store.totalAmount)
+const products = computed(() => store.products);
+const categories = computed(() => store.categories);
+const purchaseList = computed(() => store.purchaseList);
+const totalAmount = computed(() => store.totalAmount);
 
-// 过滤后的商品列表
-const filteredProducts = computed(() => {
-  if (!searchKeyword.value) return products.value
+// 计算属性
+const cartCount = computed(() => 
+  purchaseList.value.reduce((total, item) => total + item.quantity, 0)
+);
+
+const currentProducts = computed(() => {
+  let result = [...products.value];
   
-  const keyword = searchKeyword.value.toLowerCase()
-  return products.value.filter(product => 
-    product.name.toLowerCase().includes(keyword) ||
-    product.specification.toLowerCase().includes(keyword)
-  )
-})
+  // 分类过滤
+  if (activeCategory.value > 0) {
+    const category = categories.value[activeCategory.value - 1];
+    result = result.filter(product => product.categoryId === category.id);
+  }
+  
+  // 排序
+  switch (sortType.value) {
+    case 'price-desc':
+      result.sort((a, b) => b.price - a.price);
+      break;
+    case 'price-asc':
+      result.sort((a, b) => a.price - b.price);
+      break;
+    case 'stock-desc':
+      result.sort((a, b) => b.stock - a.stock);
+      break;
+    default:
+      // 默认排序保持原顺序
+      break;
+  }
+  
+  return result;
+});
 
 // 方法
-function onClickLeft() {
+function formatAmount(amount) {
+  return Number(amount || 0).toFixed(2);
+}
+
+function getProductStock(productId) {
+  const product = products.value.find(p => p.id === productId);
+  return product ? product.stock : 0;
+}
+
+function handleBack() {
   if (purchaseList.value.length) {
     showDialog({
       title: '提示',
-      message: '确定要离开吗？已自动保存为草稿',
+      message: '确定要离开当前页面吗？',
       confirmButtonText: '确定',
       cancelButtonText: '取消'
     }).then((action) => {
       if (action === 'confirm') {
-        router.back()
+        router.back();
       }
-    })
+    });
   } else {
-    router.back()
+    router.back();
   }
 }
 
-function formatAmount(amount) {
-  return Number(amount || 0).toFixed(2)
+
+
+function applyFilter() {
+  showFilterPanel.value = false;
 }
 
-function getProductStock(productId) {
-  const product = products.value.find(p => p.id === productId)
-  return product ? product.stock : 0
-}
-
-function updateQuantity(item, value) {
-  const product = products.value.find(p => p.id === item.productId)
-  if (!product) return
+function handleProductSelected(product) {
+  const existing = purchaseList.value.find(item => item.productId === product.id);
   
-  store.updatePurchaseList({
-    ...item,
-    quantity: value,
-    totalAmount: value * product.price
-  })
-}
-
-function handleDelete(item) {
-  showDialog({
-    title: '提示',
-    message: '确定要删除该商品吗？',
-    showCancelButton: true
-  }).then((action) => {
-    if (action === 'confirm') {
-      store.updatePurchaseList({...item, quantity: 0})
-      showToast('已删除')
-    }
-  })
-}
-
-function onSearch() {
-  loading.value = false
-  finished.value = false
-  error.value = false
-}
-
-function onSearchClear() {
-  searchKeyword.value = ''
-  onSearch()
-}
-
-function onRefresh() {
-  // 刷新数据
-  store.init().then(() => {
-    refreshing.value = false
-    showToast('刷新成功')
-  })
-}
-
-function onLoad() {
-  // 实际项目中这里应该调用API加载数据
-  loading.value = false
-  finished.value = true
-}
-
-function isSelected(productId) {
-  return purchaseList.value.some(item => item.productId === productId)
-}
-
-function quickAdd(product) {
-  const existing = purchaseList.value.find(item => item.productId === product.id)
   if (existing) {
-    updateQuantity(existing, existing.quantity + 1)
+    handleStepperChange({
+      ...existing,
+      quantity: existing.quantity + 1
+    });
   } else {
     store.updatePurchaseList({
       productId: product.id,
       productName: product.name,
       quantity: 1,
-      totalAmount: product.price
-    })
+      totalAmount: product.costPrice
+    });
+    
+    showToast({
+      type: 'success',
+      message: '已添加到采购单',
+      position: 'bottom'
+    });
   }
-  showToast({
-    type: 'success',
-    message: '已添加',
-    position: 'bottom'
-  })
 }
 
-function handleSubmit() {
+function handleStepperChange(item) {
+  const product = products.value.find(p => p.id === item.productId);
+  if (!product) return;
+  
+  if (item.quantity === 0) {
+    showDialog({
+      title: '提示',
+      message: '确定要从采购单中移除该商品吗？',
+      showCancelButton: true
+    }).then((action) => {
+      if (action === 'confirm') {
+        store.updatePurchaseList({
+          ...item,
+          quantity: 0
+        });
+      } else {
+        // 取消删除，恢复数量为1
+        item.quantity = 1;
+        store.updatePurchaseList({
+          ...item,
+          quantity: 1,
+          totalAmount: product.costPrice
+        });
+      }
+    });
+  } else {
+    store.updatePurchaseList({
+      ...item,
+      quantity: item.quantity,
+      totalAmount: item.quantity * product.costPrice
+    });
+  }
+}
+function handleRightClick(){
+  showToast('功能开发中')
+}
+
+function clearCart() {
+  if (!purchaseList.value.length) return;
+  
+  showDialog({
+    title: '提示',
+    message: '确定要清空采购单吗？',
+    showCancelButton: true
+  }).then((action) => {
+    if (action === 'confirm') {
+      store.clearPurchaseList();
+      showToast('已清空采购单');
+    }
+  });
+}
+
+function submitOrder() {
   showDialog({
     title: '提示',
     message: '确定要提交采购单吗？',
@@ -275,215 +298,215 @@ function handleSubmit() {
     if (action === 'confirm') {
       store.submitPurchase().then((success) => {
         if (success) {
-          router.back()
+          router.back();
         }
-      })
+      });
     }
-  })
+  });
+}
+
+//预算设置弹出框状态
+const showBudgetDialog = ref(false);
+//采购预算
+const budget = ref(0);
+
+//根据预算自动设置采购数量
+function handleAutoSetQuantity(){
+  showToast('功能开发中')
 }
 
 // 初始化
-store.init()
+onMounted(() => {
+  store.init();
+});
 </script>
 
 <style scoped>
-.page {
+.purchase-page {
   min-height: 100vh;
+  height: 100vh;
+  background-color: #f7f8fa;
   display: flex;
   flex-direction: column;
-  background: #f7f8fa;
+  overflow: hidden;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
 }
 
-.content {
+.container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.main-content {
+  display: flex;
+  height: calc(100% - 46px);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.product-container {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  -webkit-overflow-scrolling: touch;
+  width: 0; /* 防止内容撑开容器 */
+  min-width: 0; /* 确保flex布局正常工作 */
+}
+
+.cart-button {
+  position: fixed;
+  right: 16px;
+  bottom: 24px;
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 56px;
+  height: 56px;
+  padding: 0 16px;
+  border-radius: 28px;
+  background: var(--van-primary-color);
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 99;
+  box-sizing: border-box;
 }
 
-.purchase-list {
-  background: #fff;
-  border-radius: 8px;
-  overflow: hidden;
+.cart-amount {
+  margin-left: 8px;
+  font-weight: 500;
 }
 
-.purchase-item {
-  background: #fff;
+/* 筛选面板样式 */
+.filter-panel {
+  width: 80%;
+  height: 100%;
+  max-width: 375px;
+  overflow-y: auto;
 }
 
-.purchase-item:not(:last-child) {
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
   border-bottom: 1px solid #f5f5f5;
 }
 
-.product-item {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.product-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.product-name {
-  font-size: 15px;
-  font-weight: 500;
-  color: #323233;
-}
-
-.product-amount {
-  color: #ee0a24;
-  font-weight: 500;
-}
-
-.product-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.delete-btn {
-  margin-left: 12px;
-}
-
-.add-button {
-  border-radius: 8px;
+.filter-title {
   font-size: 16px;
-}
-
-.total-section {
-  margin-top: auto;
-  padding: 16px;
-  background: #fff;
-  border-radius: 8px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.total-label {
-  font-size: 15px;
-  color: #666;
-}
-
-.total-amount {
-  font-size: 20px;
-  color: #ee0a24;
   font-weight: 500;
 }
 
-.footer {
+.filter-actions {
+  position: sticky;
+  bottom: 0;
   padding: 16px;
-  background: #fff;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  background: white;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.product-selector-popup {
-  max-height: 90vh;
-}
-
-.product-selector {
-  height: 100%;
+/* 购物车面板样式 */
+.cart-panel {
+  height: 70%;
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
 }
 
-.selector-header {
-  padding: 16px 16px 0;
+.cart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #f5f5f5;
 }
 
-.selector-title {
-  display: block;
-  text-align: center;
+.cart-title {
   font-size: 16px;
   font-weight: 500;
-  color: #323233;
-  margin-bottom: 8px;
 }
 
-.selector-content {
+.cart-items {
   flex: 1;
   overflow-y: auto;
   padding: 0 16px;
 }
 
-.product-cell {
-  margin-bottom: 8px;
-  border-radius: 8px;
-  background: #fff;
-  transition: all 0.3s;
-}
-
-.product-cell:active {
-  background: #f5f5f5;
-}
-
-.product-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: #323233;
-  margin-bottom: 4px;
-}
-
-.product-spec {
-  font-size: 13px;
-  color: #666;
-  margin-left: 8px;
-  font-weight: normal;
-}
-
-.product-detail {
+.cart-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f5f5f5;
 }
 
-.product-price {
+.item-info {
+  flex: 1;
+}
+
+.item-name {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.item-price {
+  font-size: 13px;
+  color: #999;
+}
+
+.item-actions {
+  display: flex;
+  align-items: center;
+}
+
+.item-total {
+  color: #ee0a24;
+  font-weight: 500;
+  margin-right: 16px;
+}
+
+.cart-footer {
+  padding: 16px;
+  background: white;
+  border-top: 1px solid #f5f5f5;
+}
+
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cart-total-amount {
+  font-size: 20px;
   color: #ee0a24;
   font-weight: 500;
 }
 
-.product-stock {
-  color: #666;
+:deep(.van-sidebar) {
+  width: 85px;
+  height: 100%;
+  flex: none; /* 替换 flex-shrink: 0 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-:deep(.van-cell) {
-  padding: 16px;
-  line-height: 1.5;
+:deep(.van-sidebar-item) {
+  padding: 14px 12px;
+  box-sizing: border-box;
 }
 
 :deep(.van-empty) {
   padding: 32px 0;
-  background: #fff;
-}
-
-:deep(.van-stepper) {
-  height: 28px;
-}
-
-:deep(.van-stepper__input) {
-  width: 40px;
-}
-
-:deep(.van-pull-refresh) {
-  min-height: 100%;
-}
-
-:deep(.van-popup) {
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-}
-
-:deep(.van-search) {
-  padding: 8px 0;
-}
-
-:deep(.van-search__content) {
-  border-radius: 8px;
 }
 </style>

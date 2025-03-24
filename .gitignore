@@ -140,3 +140,4 @@ mine-api/.mvn/wrapper/maven-wrapper.jar
 *.bak
 *.swp
 *.orig 
+.aider*

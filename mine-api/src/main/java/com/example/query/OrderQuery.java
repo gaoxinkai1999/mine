@@ -38,4 +38,5 @@ public class OrderQuery implements BaseQuery {
         public static Set<String> WITH_DETAILS = Set.of(DETAILS, PRODUCT);
         public static Set<String> FULL = Set.of(SHOP, DETAILS, PRODUCT);
     }
+
 }

@@ -2,27 +2,28 @@ package com.example.domain.purchase.service;
 
 import com.example.domain.batch.entity.Batch;
 import com.example.domain.batch.service.BatchService;
+import com.example.domain.forecast.service.ForecastService;
 import com.example.domain.inventory.service.InventoryService;
-import com.example.domain.product.dto.ProductStockDTO;
+import com.example.domain.product.dto.ProductDto;
 import com.example.domain.product.entity.Product;
 import com.example.domain.product.service.ProductService;
+import com.example.domain.purchase.dto.ProductWithPurchaseInfoDto;
 import com.example.domain.purchase.dto.PurchaseCreateRequest;
 import com.example.domain.purchase.entity.Purchase;
 import com.example.domain.purchase.entity.PurchaseDetail;
 import com.example.domain.purchase.entity.PurchaseState;
 import com.example.domain.purchase.repository.PurchaseRepository;
-import com.example.domain.statistics.dto.response.ProductSalesInfoDTO;
 import com.example.domain.statistics.dto.response.SalesStatisticsDTO;
 import com.example.domain.statistics.service.StatisticsService;
 import com.example.exception.MyException;
 import com.example.query.ProductQuery;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import java.util.Map;
  * 处理采购订单的创建、查询和管理
  */
 @Service
+@Slf4j
 public class PurchaseService {
 
     @Autowired
@@ -48,7 +50,8 @@ public class PurchaseService {
 
     @Autowired
     private BatchService batchService; // 批次服务
-
+    @Autowired
+    private ForecastService forecastService; // 预测服务
 
 
     /**
@@ -143,95 +146,88 @@ public class PurchaseService {
     }
 
     /**
-     * 计算统一的销售天数
+     * 获取包含采购信息的在售商品列表
      *
-     * @param budget           采购预算
-     * @param products         商品列表
-     * @param salesForecastMap 商品销售预测
-     * @return 统一的销售天数
+     * @return
      */
-    private int calculateDaysOfSupply(BigDecimal budget, List<Product> products, Map<Integer, BigDecimal> salesForecastMap) {
-        // 计算总销售预测
-        BigDecimal totalSalesForecast = salesForecastMap.values()
-                                                        .stream()
-                                                        .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 计算总成本
-        BigDecimal totalCost = products.stream()
-                                       .map(product -> product.getCostPrice()
-                                                              .multiply(salesForecastMap.get(product.getId())))
-                                       .reduce(BigDecimal.ZERO, BigDecimal::add);
+    public List<ProductWithPurchaseInfoDto> getOnSaleProductsWithPurchaseInfo() {
+        // 在售商品的详细信息，包含库存
+        List<ProductDto> products = productService.getProducts();
 
-        // 如果总销售预测或总成本为 0，避免除零错误
-        if (totalSalesForecast.compareTo(BigDecimal.ZERO) == 0 || totalCost.compareTo(BigDecimal.ZERO) == 0) {
-            throw new IllegalArgumentException("总销售预测或总成本为 0，无法计算销售天数");
-        }
+        // 取出商品id
+        int[] array = products.stream()
+                              .mapToInt(ProductDto::getId)
+                              .toArray();
 
-        // 计算统一的销售天数：预算 / (总成本 / 总销售预测)
-        return budget.divide(totalCost.divide(totalSalesForecast, 4, RoundingMode.HALF_UP), RoundingMode.DOWN)
-                     .intValue();
+        Long startTime = System.currentTimeMillis();
+        // 计算预计销量和预警库存
+        Map<Integer, Map<String, Integer>> map = calculatePurchaseQuantity(array);
+        Long endTime = System.currentTimeMillis();
+        long a = endTime - startTime;
+        log.info("计算预计销量和预警库存耗时：{}ms", a);
+
+        List<ProductWithPurchaseInfoDto> list = products.stream()
+                                                        .map(productDto -> {
+                                                            ProductWithPurchaseInfoDto productWithPurchaseInfoDto = new ProductWithPurchaseInfoDto();
+                                                            productWithPurchaseInfoDto.setCategoryId(productDto.getCategoryId());
+                                                            productWithPurchaseInfoDto.setId(productDto.getId());
+                                                            productWithPurchaseInfoDto.setName(productDto.getName());
+                                                            productWithPurchaseInfoDto.setPurchasePrice(productDto.getCostPrice());
+                                                            productWithPurchaseInfoDto.setCurrentStock(productDto.getProductStockDTO()
+                                                                                                                 .getTotalInventory());
+
+                                                            map.entrySet()
+                                                               .stream()
+                                                               .filter(entry -> entry.getKey() == productDto.getId())
+                                                               .findFirst()
+                                                               .map(Map.Entry::getValue)
+                                                               .ifPresentOrElse(
+                                                                       v -> {
+                                                                           productWithPurchaseInfoDto.setWarningQuantity(v.get("warningQuantity"));
+                                                                           productWithPurchaseInfoDto.setRecommendPurchaseQuantity(v.get("forecastQuantity") - productWithPurchaseInfoDto.getCurrentStock());
+                                                                       },
+                                                                       () -> productWithPurchaseInfoDto.setIsForecastNormal(false)
+                                                               );
+
+
+                                                            return productWithPurchaseInfoDto;
+                                                        })
+                                                        .toList();
+
+        return list;
     }
 
-    /**
-     * 生成在售商品的采购数量建议
-     * 基于历史销售数据、当前库存、安全库存水平和补货周期来计算建议采购数量
-     *
-     * @param daysToAnalyze   分析的历史天数，默认为30天
-     * @param leadTimeDays    补货周期天数，默认为7天
-     * @param safetyStockDays 安全库存天数，默认为14天
-     * @return Map<Integer, Integer> 商品ID到建议采购数量的映射
-     */
-    public Map<Integer, Integer> generatePurchaseSuggestions(int daysToAnalyze, int leadTimeDays, int safetyStockDays) {
-        // 获取所有在售商品
-        List<Product> activeProducts = productService.findList(ProductQuery.builder()
-                                                                           .isDel(false)
-                                                                           .build());
+    // 商品预警库存和预计销量
+    public Map<Integer, Map<String, Integer>> calculatePurchaseQuantity(int[] productIds) {
+        Map<Integer, Map<String, Integer>> productIdQuantityMap = new HashMap<>();
+        Map<LocalDate, SalesStatisticsDTO> data = statisticsService.calculateDailyStatistics(LocalDate.now()
+                                                                                                      .minusDays(180), LocalDate.now()
+                                                                                                                                .minusDays(1));
+        Arrays.stream(productIds)
+              .forEach(productId -> {
+                  double[] productData = forecastService.getProductData(data, productId);
+                  log.info("商品{}销量数据：{}", productId, productData.length);
+                  double[] doubles = forecastService.aggregateToWeeklyData(productData);
+                  log.info("商品{}销量数据：{}", productId, doubles.length);
+                  // 预计销量
+                  double forecastData = 0;
+                  try {
+                      log.info("商品{}预计销量计算中...", productId);
+                      forecastData = forecastService.forecast(doubles, 4);
+                  } catch (MyException e) {
+                      log.error("商品{}预计销量计算失败", productId);
+                      productIdQuantityMap.put(productId, null);
+                      return;
+                  }
 
-        // 获取历史销售数据
-        LocalDate endDate = LocalDate.now();
-        LocalDate startDate = endDate.minusDays(daysToAnalyze);
-        Map<LocalDate, SalesStatisticsDTO> dailyStats = statisticsService.calculateDailyStatistics(startDate, endDate);
+                  // 预警库存
+                  double warningStock = (forecastData / 28) * 5;
 
-        Map<Integer, Integer> suggestions = new HashMap<>();
-
-        for (Product product : activeProducts) {
-            // 1. 计算日均销量
-            double totalSales = 0;
-            for (SalesStatisticsDTO stats : dailyStats.values()) {
-                for (ProductSalesInfoDTO productStats : stats.getProductSalesInfoDTOS()) {
-                    if (productStats.getProductId() == product.getId()) {
-                        totalSales += productStats.getQuantity();
-                    }
-                }
-            }
-            double dailyAvgSales = totalSales / daysToAnalyze;
-
-            // 2. 获取当前库存
-            ProductStockDTO stockInfo = inventoryService.getProductStock(product.getId());
-            int currentStock = stockInfo.getTotalInventory();
-
-            // 3. 计算安全库存水平
-            int safetyStock = (int) Math.ceil(dailyAvgSales * safetyStockDays);
-
-            // 4. 计算补货点水平 (到货前预计销售量 + 安全库存)
-            int reorderPoint = (int) Math.ceil(dailyAvgSales * leadTimeDays) + safetyStock;
-
-            // 5. 如果当前库存低于补货点，计算建议采购数量
-            if (currentStock <= reorderPoint) {
-                // 建议采购数量 = 补货周期内的预计销量 + 安全库存 - 当前库存
-                int suggestedQuantity = (int) Math.ceil(dailyAvgSales * leadTimeDays) + safetyStock - currentStock;
-
-                // 确保建议数量为正数
-                if (suggestedQuantity > 0) {
-                    suggestions.put(product.getId(), suggestedQuantity);
-                }
-            }
-        }
-
-        return suggestions;
+                  productIdQuantityMap.put(productId, Map.of("forecastQuantity", (int) forecastData, "warningQuantity", (int) warningStock));
+              });
+        return productIdQuantityMap;
     }
-
-
 
 
 }

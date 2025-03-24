@@ -49,20 +49,16 @@ const api = {
   },
 
   /**
-   * @description 获取商品采购建议（基于历史平均值）
-   * @url /purchase/suggestions
+   * @description 
+   * @url /purchase/getOnSaleProductsWithPurchaseInfo
    * @method GET
-   * @param {Object} params Query parameters
-   * @param {number} params.daysToAnalyze 分析的历史天数
-   * @param {number} params.leadTimeDays 补货周期天数
-   * @param {number} params.safetyStockDays 安全库存天数
+
    * @returns {Promise<any>}
    */
-  getPurchaseSuggestions(params = {}) {
+  getOnSaleProductsWithPurchaseInfo() {
     return request({
-      url: '/purchase/suggestions',
-      method: 'GET',
-      params
+      url: '/purchase/getOnSaleProductsWithPurchaseInfo',
+      method: 'GET'
     })
   }
 }
