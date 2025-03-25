@@ -1,6 +1,8 @@
 package com.example.domain.product.service;
 
 import com.example.domain.batch.service.BatchService;
+import com.example.domain.inventory.entity.Inventory;
+import com.example.domain.inventory.repository.InventoryRepository;
 import com.example.domain.inventory.service.InventoryService;
 import com.example.domain.price.entity.PriceRuleDetail;
 import com.example.domain.price.service.PriceRuleService;
@@ -29,6 +31,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -60,6 +63,9 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
     private ProductMapper productMapper; // 产品映射器，用于对象转换
     @Autowired
     private ShopService shopService;
+    
+    @Autowired
+    private InventoryRepository inventoryRepository;
 
 
     /**软删除商品 */
@@ -71,9 +77,24 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
     }
     /**
      * 新建商品
-     * @param productDto
+     * @param productDto 商品DTO
+     * @return 新创建的商品ID
+     * @throws MyException 如果商品名称已存在或价格无效
      */
-    public void createProduct(ProductDto productDto) {
+    @Transactional
+    public int createProduct(ProductDto productDto) {
+        // 检查商品名称是否已存在
+        if (productRepository.existsByName(productDto.getName())) {
+            throw new MyException("商品名称已存在: " + productDto.getName());
+        }
+        
+        // 验证价格
+        if (productDto.getCostPrice().compareTo(BigDecimal.ZERO) < 0 || 
+            productDto.getDefaultSalePrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new MyException("价格不能为负数");
+        }
+
+        // 创建商品
         Product product = new Product();
         product.setBatchManaged(productDto.isBatchManaged());
         product.setCategory(categoryService.findOne(CategoryQuery.builder()
@@ -85,7 +106,15 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
         product.setDefaultSalePrice(productDto.getDefaultSalePrice());
         product.setDel(false);
         product.setSort(productRepository.findMaxSort() + 1);
-        productRepository.save(product);
+        product = productRepository.save(product);
+        
+        // 初始化库存记录
+        Inventory inventory = inventoryService.findOrCreateInventory(product, null);
+        inventory.setQuantity(0);
+        inventoryRepository.save(inventory);
+        
+        log.info("创建商品成功, ID: {}, 已初始化库存", product.getId());
+        return product.getId();
     }
 
     /**

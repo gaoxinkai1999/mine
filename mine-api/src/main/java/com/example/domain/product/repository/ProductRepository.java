@@ -37,4 +37,10 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     @Query("SELECT MIN(o.createTime) FROM Order o JOIN o.orderDetails od WHERE od.product.id = :productId")
     LocalDate findEarliestSaleDateByProductId(@Param("productId") Integer productId);
 
+    /**
+     * 检查商品名称是否已存在
+     * @param name 商品名称
+     * @return 是否存在
+     */
+    boolean existsByName(String name);
 }
