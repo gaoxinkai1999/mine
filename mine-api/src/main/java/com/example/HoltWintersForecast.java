@@ -6,58 +6,67 @@ import java.util.Arrays;
 import java.util.stream.IntStream;
 
 /**
- * 三重指数平滑(Holt-Winters)算法实现
- * 适用于具有季节性的时间序列数据预测
+ * 提供 Holt-Winters (三重指数平滑) 和 Holt (双指数平滑) 算法的核心实现及相关工具方法。
  * <p>
- * 更新：
- * 1. 优化日度数据参数范围
- * 2. 为双指数平滑降级方法增加参数优化功能
- * 3. 专注于年季节性预测，针对日度数据特点优化
- * 4. 增强零值和高波动数据处理能力
+ * 主要职责:
+ * 1. 实现季节性和非季节性指数平滑的核心计算逻辑。
+ * 2. 提供参数优化方法 (基于交叉验证)。
+ * 3. 提供数据评估指标计算方法 (MAPE, RMSE, MAE)。
+ * 4. 提供数据平滑工具方法 (如移动平均)。
+ * <p>
+ * 注意: 此类不再负责模型选择或自动执行整个预测流程，这些职责转移到策略类和 ForecastService。
  */
 @Slf4j
 public class HoltWintersForecast {
+
+    // #########################################################################
+    // # Constants and Enums
+    // #########################################################################
 
     /**
      * 季节性模型类型
      */
     public enum SeasonalityType {
-        MULTIPLICATIVE,  // 乘法季节性
-        ADDITIVE         // 加法季节性
+        MULTIPLICATIVE, // 乘法季节性
+        ADDITIVE        // 加法季节性
     }
 
-    // 算法参数
-    private double alpha;          // 水平平滑系数
-    private double beta;           // 趋势平滑系数
-    private double gamma;          // 季节性平滑系数
-    private final int seasonLength; // 季节周期长度
+    // 默认季节长度（年度季节性）
+    public static final int DEFAULT_DAILY_SEASON_LENGTH = 365;
+
+    // #########################################################################
+    // # Core Holt-Winters Seasonal Algorithm (Instance-based for state)
+    // #########################################################################
+
+    private double alpha;           // 水平平滑系数
+    private double beta;            // 趋势平滑系数
+    private double gamma;           // 季节性平滑系数
+    private final int seasonLength;  // 季节周期长度
     private final SeasonalityType seasonalityType; // 季节性模型类型
 
-    // 预测所需的模型组件
-    private double level;          // 序列水平
-    private double trend;          // 序列趋势
-    private double[] seasonal;     // 季节性因子
+    // 模型状态
+    private double level;           // 当前水平
+    private double trend;           // 当前趋势
+    private double[] seasonal;      // 当前季节性因子
+    private boolean initialized = false; // 模型是否已初始化
+    private int lastObservationIndex = -1; // 训练数据最后一个点的索引
 
-    // 历史拟合结果与误差
+    // 拟合和残差（可选，用于评估）
     private double[] fittedValues;
     private double[] residuals;
 
-    // 训练集中的最后一个观测值的索引
-    private int lastObservationIndex;
 
     /**
-     * 构造函数
+     * 构造函数 (用于季节性模型实例)
      *
      * @param alpha           水平平滑系数 (0 < alpha < 1)
-     * @param beta            趋势平滑系数 (0 < beta < 1)
+     * @param beta            趋势平滑系数 (0 <= beta < 1)
      * @param gamma           季节性平滑系数 (0 < gamma < 1)
-     * @param seasonLength    季节周期长度(如按月数据为12，按周数据为52，日度数据使用365)
-     * @param seasonalityType 季节性模型类型(乘法或加法)
+     * @param seasonLength    季节周期长度 (例如 365 代表年度季节性)
+     * @param seasonalityType 季节性模型类型 (乘法或加法)
      */
-    public HoltWintersForecast(double alpha, double beta, double gamma, int seasonLength,
-                               SeasonalityType seasonalityType) {
-        validateParameters(alpha, beta, gamma, seasonLength);
-
+    public HoltWintersForecast(double alpha, double beta, double gamma, int seasonLength, SeasonalityType seasonalityType) {
+        validateSeasonalParameters(alpha, beta, gamma, seasonLength);
         this.alpha = alpha;
         this.beta = beta;
         this.gamma = gamma;
@@ -67,438 +76,606 @@ public class HoltWintersForecast {
     }
 
     /**
-     * 构造函数 - 默认使用乘法季节性模型
+     * 验证季节性模型参数的合法性。
      */
-    public HoltWintersForecast(double alpha, double beta, double gamma, int seasonLength) {
-        this(alpha, beta, gamma, seasonLength, SeasonalityType.MULTIPLICATIVE);
+    private static void validateSeasonalParameters(double alpha, double beta, double gamma, int seasonLength) {
+        if (alpha <= 0 || alpha >= 1) throw new IllegalArgumentException("Alpha 必须在 (0, 1) 之间");
+        if (beta < 0 || beta >= 1) throw new IllegalArgumentException("Beta 必须在 [0, 1) 之间");
+        if (gamma <= 0 || gamma >= 1) throw new IllegalArgumentException("Gamma 必须在 (0, 1) 之间");
+        if (seasonLength <= 1) throw new IllegalArgumentException("季节长度必须大于 1");
     }
 
     /**
-     * 验证参数合法性
-     */
-    private void validateParameters(double alpha, double beta, double gamma, int seasonLength) {
-        if (alpha <= 0 || alpha >= 1) {
-            throw new IllegalArgumentException("Alpha必须在0和1之间(不含0和1)");
-        }
-        if (beta < 0 || beta >= 1) {
-            throw new IllegalArgumentException("Beta必须在0和1之间(包含0，不含1)，0表示无趋势");
-        }
-        if (gamma <= 0 || gamma >= 1) {
-            throw new IllegalArgumentException("Gamma必须在0和1之间(不含0和1)");
-        }
-        if (seasonLength <= 1) {
-            throw new IllegalArgumentException("季节长度必须至少为2");
-        }
-    }
-
-    /**
-     * 使用历史数据初始化模型
+     * 使用历史数据初始化季节性模型的状态。
+     * 至少需要两个完整季节的数据。
      *
-     * @param historicalData 历史销量数据
-     * @return 是否成功初始化
+     * @param historicalData 历史数据数组。
+     * @throws IllegalArgumentException 如果数据不足。
      */
-    public boolean initialize(double[] historicalData) {
+    public void initializeSeasonalModel(double[] historicalData) {
         if (historicalData == null || historicalData.length < 2 * seasonLength) {
-            throw new IllegalArgumentException(
-                    "历史数据必须至少包含两个完整的季节周期(最少需要" + (2 * seasonLength) + "个观测值)");
+            throw new IllegalArgumentException("季节性模型初始化需要至少 " + (2 * seasonLength) + " 个数据点");
         }
 
-        // 初始化结果数组
-        fittedValues = new double[historicalData.length];
-        residuals = new double[historicalData.length];
-        lastObservationIndex = historicalData.length - 1;
-
-        // 初始化水平值(取第一个季节的平均值)
-        double sum = 0;
+        // 1. 初始化水平 (Level) - 使用第一个季节的平均值
+        double firstSeasonSum = 0;
         for (int i = 0; i < seasonLength; i++) {
-            sum += historicalData[i];
+            firstSeasonSum += historicalData[i];
         }
-        level = sum / seasonLength;
+        this.level = firstSeasonSum / seasonLength;
 
-        // 初始化趋势值
-        if (beta > 0) {
-            trend = 0;
-            for (int i = 0; i < seasonLength; i++) {
-                trend += (historicalData[seasonLength + i] - historicalData[i]);
-            }
-            trend = trend / (seasonLength * seasonLength);
-        } else {
-            trend = 0;  // 如果beta为0，则没有趋势
+        // 2. 初始化趋势 (Trend) - 使用前两个季节的平均差异
+        double firstTwoSeasonsDiffSum = 0;
+        for (int i = 0; i < seasonLength; i++) {
+            firstTwoSeasonsDiffSum += (historicalData[seasonLength + i] - historicalData[i]);
         }
+        // 如果 beta 为 0，则趋势为 0
+        this.trend = (beta > 0) ? firstTwoSeasonsDiffSum / (seasonLength * seasonLength) : 0;
 
-        // 初始化季节性因子
+        // 3. 初始化季节性因子 (Seasonal Factors)
+        this.seasonal = new double[seasonLength];
         for (int i = 0; i < seasonLength; i++) {
             if (seasonalityType == SeasonalityType.MULTIPLICATIVE) {
-                seasonal[i] = historicalData[i] / (level == 0 ? 0.0001 : level);
-            } else {
-                seasonal[i] = historicalData[i] - level;
+                // 防止除以零
+                this.seasonal[i] = historicalData[i] / (this.level == 0 ? 1e-6 : this.level);
+            } else { // ADDITIVE
+                this.seasonal[i] = historicalData[i] - this.level;
             }
         }
 
-        // 归一化季节性因子
+        // 4. 归一化季节性因子
         normalizeSeasonalFactors();
 
-        return true;
+        this.initialized = true;
+        this.lastObservationIndex = -1; // 重置训练索引
+        log.debug("季节性模型初始化完成: Level={}, Trend={}", this.level, this.trend);
     }
 
+
     /**
-     * 归一化季节性因子，使其均值为1(乘法模型)或0(加法模型)
+     * 归一化季节性因子，确保乘法模型因子之和约为 seasonLength，加法模型因子之和约为 0。
      */
     private void normalizeSeasonalFactors() {
-        double sum = 0;
-        for (double factor : seasonal) {
-            sum += factor;
-        }
+        if (seasonal == null || seasonal.length == 0) return;
+
+        double factorSum = Arrays.stream(seasonal).sum();
+        double adjustment;
 
         if (seasonalityType == SeasonalityType.MULTIPLICATIVE) {
-            // 乘法模型中因子均值应为1
-            double meanFactor = sum / seasonLength;
-            if (meanFactor != 0) {
-                for (int i = 0; i < seasonLength; i++) {
-                    seasonal[i] /= meanFactor;
-                }
-            }
-        } else {
-            // 加法模型中因子均值应为0
-            double meanFactor = sum / seasonLength;
+            // 乘法模型：因子平均值应为 1
+            adjustment = seasonLength / (factorSum == 0 ? 1e-6 : factorSum);
             for (int i = 0; i < seasonLength; i++) {
-                seasonal[i] -= meanFactor;
+                seasonal[i] *= adjustment;
+            }
+        } else { // ADDITIVE
+            // 加法模型：因子总和应为 0
+            adjustment = factorSum / seasonLength;
+            for (int i = 0; i < seasonLength; i++) {
+                seasonal[i] -= adjustment;
             }
         }
     }
 
+
     /**
-     * 对模型进行训练
+     * 使用给定的训练数据更新季节性模型的状态。
+     * 必须先调用 initializeSeasonalModel。
      *
-     * @param trainingData 训练数据
+     * @param trainingData 训练数据数组。
+     * @throws IllegalStateException 如果模型未初始化。
      */
-    public void train(double[] trainingData) {
-        if (trainingData == null || trainingData.length <= seasonLength) {
-            throw new IllegalArgumentException("训练数据不足");
+    public void trainSeasonalModel(double[] trainingData) {
+        if (!initialized) {
+            throw new IllegalStateException("季节性模型必须先初始化");
+        }
+        if (trainingData == null || trainingData.length == 0) {
+            log.warn("训练数据为空，跳过训练");
+            return;
         }
 
-        // 确保模型已初始化
-        if (seasonal[0] == 0) {
-            if (!initialize(trainingData)) {
-                throw new IllegalStateException("模型初始化失败");
-            }
-        }
+        // 初始化拟合值和残差数组（如果需要记录）
+        this.fittedValues = new double[trainingData.length];
+        this.residuals = new double[trainingData.length];
 
-        double[] y = trainingData;
         double prevLevel, prevTrend;
+        double currentObservation;
 
-        // 计算第一个季节周期的拟合值
-        for (int i = 0; i < seasonLength; i++) {
-            if (seasonalityType == SeasonalityType.MULTIPLICATIVE) {
-                fittedValues[i] = (level + trend * (i + 1)) * seasonal[i];
-            } else {
-                fittedValues[i] = level + trend * (i + 1) + seasonal[i];
-            }
-            residuals[i] = y[i] - fittedValues[i];
-        }
+        for (int i = 0; i < trainingData.length; i++) {
+            currentObservation = trainingData[i];
+            // 注意：这里的季节索引应该基于整个时间序列的位置，而不是训练数据的索引
+            // 如果训练数据不是从时间序列的开始，需要调整 seasonIndex 的计算
+            // 假设 trainingData 是紧接着初始化数据之后的数据，或者从头开始
+            int seasonIndex = i % seasonLength; // 简化假设：训练数据从季节开始
 
-        // 使用训练数据更新模型参数
-        for (int i = seasonLength; i < y.length; i++) {
-            int season = i % seasonLength;
-
-            prevLevel = level;
-            prevTrend = trend;
+            prevLevel = this.level;
+            prevTrend = this.trend;
 
             if (seasonalityType == SeasonalityType.MULTIPLICATIVE) {
-                // 乘法模型更新公式
-                double denominator = seasonal[season] == 0 ? 0.0001 : seasonal[season]; // 防止除零
-                level = alpha * (y[i] / denominator) + (1 - alpha) * (prevLevel + prevTrend);
-                trend = beta * (level - prevLevel) + (1 - beta) * prevTrend;
+                // 乘法模型更新
+                double seasonalFactor = this.seasonal[seasonIndex];
+                // 防止除以零
+                double levelDenominator = (prevLevel + prevTrend);
+                levelDenominator = (levelDenominator == 0) ? 1e-6 : levelDenominator;
+                double observationOverSeasonal = currentObservation / (seasonalFactor == 0 ? 1e-6 : seasonalFactor);
 
-                denominator = level == 0 ? 0.0001 : level; // 防止除零
-                seasonal[season] = gamma * (y[i] / denominator) + (1 - gamma) * seasonal[season];
-
-                // 计算拟合值
-                fittedValues[i] = (prevLevel + prevTrend) * seasonal[season];
-            } else {
-                // 加法模型更新公式
-                level = alpha * (y[i] - seasonal[season]) + (1 - alpha) * (prevLevel + prevTrend);
-                trend = beta * (level - prevLevel) + (1 - beta) * prevTrend;
-                seasonal[season] = gamma * (y[i] - level) + (1 - gamma) * seasonal[season];
+                this.level = alpha * observationOverSeasonal + (1 - alpha) * (prevLevel + prevTrend);
+                this.trend = beta * (this.level - prevLevel) + (1 - beta) * prevTrend;
+                this.seasonal[seasonIndex] = gamma * (currentObservation / (this.level == 0 ? 1e-6 : this.level)) + (1 - gamma) * seasonalFactor;
 
                 // 计算拟合值
-                fittedValues[i] = prevLevel + prevTrend + seasonal[season];
+                this.fittedValues[i] = (prevLevel + prevTrend) * seasonalFactor;
+
+            } else { // ADDITIVE
+                // 加法模型更新
+                double seasonalComponent = this.seasonal[seasonIndex];
+                double observationMinusSeasonal = currentObservation - seasonalComponent;
+
+                this.level = alpha * observationMinusSeasonal + (1 - alpha) * (prevLevel + prevTrend);
+                this.trend = beta * (this.level - prevLevel) + (1 - beta) * prevTrend;
+                this.seasonal[seasonIndex] = gamma * (currentObservation - this.level) + (1 - gamma) * seasonalComponent;
+
+                // 计算拟合值
+                this.fittedValues[i] = prevLevel + prevTrend + seasonalComponent;
             }
 
             // 计算残差
-            residuals[i] = y[i] - fittedValues[i];
-        }
+            this.residuals[i] = currentObservation - this.fittedValues[i];
 
-        // 季节性因子再归一化，确保平均值符合要求
-        normalizeSeasonalFactors();
+            // 每次更新季节性因子后都进行归一化，保持稳定性
+            normalizeSeasonalFactors();
+        }
+        this.lastObservationIndex = trainingData.length - 1;
+        log.debug("季节性模型训练完成。最终 Level={}, Trend={}", this.level, this.trend);
     }
 
     /**
-     * 使用网格搜索找到最优参数（针对日度数据优化参数范围）
+     * 使用训练好的季节性模型进行预测。
      *
-     * @param trainingData    训练数据
-     * @param alphaValues     待测试的alpha值数组
-     * @param betaValues      待测试的beta值数组
-     * @param gammaValues     待测试的gamma值数组
-     * @param seasonLength    季节长度
-     * @param seasonalityType 季节性类型
-     * @return 最优参数组合
+     * @param periods 要预测的未来期数。
+     * @return 包含未来每日预测值的数组。
+     * @throws IllegalStateException 如果模型未训练。
      */
-    public static double[] findOptimalParameters(double[] trainingData, double[] alphaValues,
-                                                 double[] betaValues, double[] gammaValues,
-                                                 int seasonLength, SeasonalityType seasonalityType) {
-        if (trainingData.length < 3 * seasonLength) {
-            throw new IllegalArgumentException("参数优化需要至少3个季节的数据");
+    public double[] forecastSeasonal(int periods) {
+        if (!initialized || lastObservationIndex < 0) { // 确保初始化和训练过
+            throw new IllegalStateException("季节性模型尚未初始化或训练");
         }
-
-        // 将数据分为训练集和验证集
-        int validationStart = trainingData.length - seasonLength;
-        double[] trainSet = Arrays.copyOfRange(trainingData, 0, validationStart);
-        double[] validationSet = Arrays.copyOfRange(trainingData, validationStart, trainingData.length);
-
-        double bestMAPE = Double.MAX_VALUE;
-        double[] bestParams = new double[3];
-
-        // 网格搜索
-        for (double alpha : alphaValues) {
-            for (double beta : betaValues) {
-                for (double gamma : gammaValues) {
-                    try {
-                        HoltWintersForecast model = new HoltWintersForecast(alpha, beta, gamma,
-                                seasonLength, seasonalityType);
-                        model.train(trainSet);
-
-                        // 预测验证集
-                        double[] forecast = model.forecast(validationSet.length);
-
-                        // 计算MAPE
-                        double mape = calculateMAPE(validationSet, forecast);
-
-                        // 更新最优参数
-                        if (mape < bestMAPE) {
-                            bestMAPE = mape;
-                            bestParams[0] = alpha;
-                            bestParams[1] = beta;
-                            bestParams[2] = gamma;
-                        }
-                    } catch (Exception e) {
-                        // 忽略无效参数组合
-                        System.err.println("无效参数组合: " +
-                                alpha + ", " + beta + ", " + gamma + " - " + e.getMessage());
-                    }
-                }
-            }
-        }
-
-        System.out.println("最优参数: alpha=" + bestParams[0] +
-                ", beta=" + bestParams[1] + ", gamma=" + bestParams[2] +
-                ", MAPE=" + bestMAPE);
-
-        return bestParams;
-    }
-
-    /**
-     * 使用时间序列交叉验证找到最优参数
-     * @param trainingData 训练数据
-     * @param alphaValues alpha参数候选值
-     * @param betaValues beta参数候选值
-     * @param gammaValues gamma参数候选值
-     * @param seasonLength 季节长度
-     * @param seasonalityType 季节性类型
-     * @return 最优参数组合
-     */
-    public static double[] findOptimalParametersWithCV(double[] trainingData, 
-                                                 double[] alphaValues,
-                                                 double[] betaValues, 
-                                                 double[] gammaValues,
-                                                 int seasonLength, 
-                                                 SeasonalityType seasonalityType) {
-        if (trainingData.length < 3 * seasonLength) {
-            throw new IllegalArgumentException("参数优化需要至少3个季节的数据");
-        }
-
-        // 设置交叉验证参数
-        int minTrainSize = 2 * seasonLength; // 最小训练集大小
-        int windowSize = seasonLength; // 验证窗口大小
-        int step = Math.max(1, seasonLength / 4); // 滑动步长(季节长度的四分之一)
-        int numFolds = Math.max(3, (trainingData.length - minTrainSize - windowSize) / step + 1); // 至少3个折
-
-        // 限制折数，避免过多计算
-        numFolds = Math.min(numFolds, 8);
-        
-        System.out.println("执行" + numFolds + "折时间序列交叉验证...");
-
-        double bestAverageMAPE = Double.MAX_VALUE;
-        double[] bestParams = new double[3];
-
-        // 网格搜索
-        for (double alpha : alphaValues) {
-            for (double beta : betaValues) {
-                for (double gamma : gammaValues) {
-                    try {
-                        double totalMAPE = 0;
-                        int validFolds = 0;
-
-                        // 对每个交叉验证折进行评估
-                        for (int fold = 0; fold < numFolds; fold++) {
-                            int validationStart = minTrainSize + fold * step;
-                            int validationEnd = Math.min(validationStart + windowSize, trainingData.length);
-                            
-                            // 确保验证集大小合理
-                            if (validationEnd - validationStart < seasonLength / 2) {
-                                continue;
-                            }
-
-                            // 提取当前折的训练集和验证集
-                            double[] foldTrainSet = Arrays.copyOfRange(trainingData, 0, validationStart);
-                            double[] foldValidationSet = Arrays.copyOfRange(trainingData, validationStart, validationEnd);
-
-                            // 使用当前参数训练模型
-                            HoltWintersForecast model = new HoltWintersForecast(alpha, beta, gamma,
-                                    seasonLength, seasonalityType);
-                            model.train(foldTrainSet);
-
-                            // 预测验证集
-                            double[] forecast = model.forecast(foldValidationSet.length);
-
-                            // 计算此折的MAPE
-                            double foldMAPE = calculateMAPE(foldValidationSet, forecast);
-                            
-                            // 排除异常值
-                            if (!Double.isNaN(foldMAPE) && foldMAPE < 1000) {
-                                totalMAPE += foldMAPE;
-                                validFolds++;
-                            }
-                        }
-
-                        // 计算平均MAPE
-                        double averageMAPE = validFolds > 0 ? totalMAPE / validFolds : Double.MAX_VALUE;
-
-                        // 更新最优参数
-                        if (validFolds >= numFolds / 2 && averageMAPE < bestAverageMAPE) {
-                            bestAverageMAPE = averageMAPE;
-                            bestParams[0] = alpha;
-                            bestParams[1] = beta;
-                            bestParams[2] = gamma;
-                        }
-                    } catch (Exception e) {
-                        // 忽略无效参数组合
-                        System.err.println("无效参数组合: " +
-                                alpha + ", " + beta + ", " + gamma + " - " + e.getMessage());
-                    }
-                }
-            }
-        }
-
-        System.out.println("交叉验证最优参数: alpha=" + bestParams[0] +
-                ", beta=" + bestParams[1] + ", gamma=" + bestParams[2] +
-                ", 平均MAPE=" + bestAverageMAPE);
-
-        return bestParams;
-    }
-
-    /**
-     * 计算平均绝对百分比误差(MAPE)
-     */
-    public static double calculateMAPE(double[] actual, double[] forecast) {
-        if (actual.length != forecast.length) {
-            throw new IllegalArgumentException("实际值和预测值数组长度必须相同");
-        }
-
-        double sum = 0;
-        int count = 0;
-
-        for (int i = 0; i < actual.length; i++) {
-            if (actual[i] != 0) {  // 避免除以零
-                sum += Math.abs((actual[i] - forecast[i]) / actual[i]);
-                count++;
-            }
-        }
-
-        return (count > 0) ? (sum / count) * 100.0 : Double.NaN;
-    }
-
-    /**
-     * 计算均方根误差(RMSE)
-     */
-    public static double calculateRMSE(double[] actual, double[] forecast) {
-        if (actual.length != forecast.length) {
-            throw new IllegalArgumentException("实际值和预测值数组长度必须相同");
-        }
-
-        double sumSquaredError = 0;
-
-        for (int i = 0; i < actual.length; i++) {
-            double error = actual[i] - forecast[i];
-            sumSquaredError += error * error;
-        }
-
-        return Math.sqrt(sumSquaredError / actual.length);
-    }
-
-    /**
-     * 计算平均绝对误差(MAE)，对零值和极小值更不敏感
-     */
-    public static double calculateMAE(double[] actual, double[] forecast) {
-        if (actual.length != forecast.length) {
-            throw new IllegalArgumentException("实际值和预测值数组长度必须相同");
-        }
-
-        double sumAbsError = 0;
-
-        for (int i = 0; i < actual.length; i++) {
-            sumAbsError += Math.abs(actual[i] - forecast[i]);
-        }
-
-        return sumAbsError / actual.length;
-    }
-
-    /**
-     * 预测未来销量
-     *
-     * @param periods 要预测的期数
-     * @return 预测结果数组
-     */
-    public double[] forecast(int periods) {
         if (periods <= 0) {
             return new double[0];
         }
 
-        // 确保模型已训练
-        if (level == 0 && seasonal[0] == 0) {
-            throw new IllegalStateException("模型尚未训练");
-        }
-
         double[] forecasts = new double[periods];
-
-        for (int i = 0; i < periods; i++) {
-            int season = (lastObservationIndex + i + 1) % seasonLength;
+        for (int i = 1; i <= periods; i++) {
+            // 计算预测点对应的季节索引，相对于训练数据最后一个点
+            int seasonIndex = (this.lastObservationIndex + i) % seasonLength;
+            double forecastValue;
 
             if (seasonalityType == SeasonalityType.MULTIPLICATIVE) {
-                forecasts[i] = (level + trend * (i + 1)) * seasonal[season];
-            } else {
-                forecasts[i] = level + trend * (i + 1) + seasonal[season];
+                forecastValue = (this.level + i * this.trend) * this.seasonal[seasonIndex];
+            } else { // ADDITIVE
+                forecastValue = this.level + i * this.trend + this.seasonal[seasonIndex];
             }
 
-            // 确保预测值不为负
-            if (forecasts[i] < 0) {
-                forecasts[i] = 0;
-            }
+            // 确保预测值非负
+            forecasts[i - 1] = Math.max(0, forecastValue);
         }
-
         return forecasts;
     }
 
-    /**
-     * 获取模型评估指标
+
+    // #########################################################################
+    // # Core Holt Non-Seasonal Algorithm (Static Methods)
+    // #########################################################################
+
+     /**
+     * 使用双指数平滑(Holt)方法预测(无季节性)，使用指定参数。
+     * 这是一个静态方法，因为它不维护季节性状态。
      *
-     * @return 包含各项评估指标的数组(MAPE, RMSE, MAE)
+     * @param data    历史数据数组。
+     * @param periods 预测期数。
+     * @param alpha   水平平滑系数 (0 < alpha < 1)。
+     * @param beta    趋势平滑系数 (0 <= beta < 1)。
+     * @return 包含未来每日预测值的数组。
+     * @throws IllegalArgumentException 如果数据不足或参数无效。
      */
-    public double[] getModelMetrics() {
-        if (fittedValues == null || residuals == null) {
-            throw new IllegalStateException("模型尚未训练");
+    public static double[] forecastHoltNonSeasonal(double[] data, int periods, double alpha, double beta) {
+        if (data == null || data.length < 2) {
+            throw new IllegalArgumentException("Holt 非季节性预测至少需要 2 个数据点");
+        }
+        validateNonSeasonalParameters(alpha, beta);
+        if (periods <= 0) {
+            return new double[0];
         }
 
+        // 初始化水平和趋势
+        double level = data[0];
+        // 稍微稳健的趋势初始化
+        double trend = calculateInitialTrend(data);
+
+        // 根据历史数据更新水平和趋势
+        for (int i = 1; i < data.length; i++) {
+            double prevLevel = level;
+            // Holt 更新公式
+            level = alpha * data[i] + (1 - alpha) * (level + trend);
+            trend = beta * (level - prevLevel) + (1 - beta) * trend;
+        }
+
+        // 预测
+        double[] forecast = new double[periods];
+        for (int i = 1; i <= periods; i++) {
+            double forecastValue = level + i * trend;
+            forecast[i - 1] = Math.max(0, forecastValue); // 确保预测值非负
+        }
+
+        return forecast;
+    }
+
+    /**
+     * 验证非季节性模型参数 (alpha, beta)。
+     */
+    private static void validateNonSeasonalParameters(double alpha, double beta) {
+        if (alpha <= 0 || alpha >= 1) throw new IllegalArgumentException("Alpha 必须在 (0, 1) 之间");
+        if (beta < 0 || beta >= 1) throw new IllegalArgumentException("Beta 必须在 [0, 1) 之间");
+    }
+
+    /**
+     * 计算初始趋势的更稳健方法 (例如，前几个点的平均差异)。
+     */
+    private static double calculateInitialTrend(double[] data) {
+        if (data.length < 2) return 0;
+        int n = Math.min(data.length, 5); // 使用最多前5个点
+        if (n < 2) return data.length > 1 ? data[1] - data[0] : 0;
+
+        double sumDiff = 0;
+        for (int i = 1; i < n; i++) {
+            sumDiff += (data[i] - data[i-1]);
+        }
+        return sumDiff / (n - 1);
+    }
+
+
+    // #########################################################################
+    // # Parameter Optimization (Static Methods)
+    // #########################################################################
+
+    /**
+     * 使用网格搜索和时间序列交叉验证为季节性模型找到最优参数 (alpha, beta, gamma)。
+     *
+     * @param trainingData    训练数据
+     * @param alphaValues     Alpha 参数候选值数组。
+     * @param betaValues      Beta 参数候选值数组。
+     * @param gammaValues     Gamma 参数候选值数组。
+     * @param seasonLength    季节长度。
+     * @param seasonalityType 季节性类型。
+     * @param useMAE          是否使用 MAE (均值绝对误差) 代替 MAPE (均值绝对百分比误差) 进行评估，MAE 对 0 值更鲁棒。
+     * @return 包含最优 [alpha, beta, gamma] 的数组。
+     * @throws IllegalArgumentException 如果数据不足。
+     */
+    public static double[] findOptimalSeasonalParametersCV(double[] trainingData,
+                                                           double[] alphaValues,
+                                                           double[] betaValues,
+                                                           double[] gammaValues,
+                                                           int seasonLength,
+                                                           SeasonalityType seasonalityType,
+                                                           boolean useMAE) {
+        if (trainingData == null || trainingData.length < 3 * seasonLength) {
+            throw new IllegalArgumentException("季节性参数优化需要至少 " + (3 * seasonLength) + " 个数据点");
+        }
+
+        // 交叉验证设置
+        int minTrainSize = 2 * seasonLength; // 至少需要两个季节来初始化
+        int validationWindowSize = seasonLength; // 验证窗口为一个季节长度
+        int step = Math.max(1, seasonLength / 4); // 滑动步长
+        int numFolds = Math.max(3, (trainingData.length - minTrainSize - validationWindowSize) / step + 1);
+        numFolds = Math.min(numFolds, 8); // 限制最大折数
+
+        log.info("开始季节性参数优化 ({} 折交叉验证, 评估指标: {})...", numFolds, useMAE ? "MAE" : "MAPE");
+
+        double bestAvgError = Double.MAX_VALUE;
+        double[] bestParams = new double[3]; // [alpha, beta, gamma]
+
+        // 默认参数范围 (如果未提供)
+        alphaValues = (alphaValues == null || alphaValues.length == 0) ? new double[]{0.05, 0.1, 0.2, 0.3} : alphaValues;
+        betaValues = (betaValues == null || betaValues.length == 0) ? new double[]{0.01, 0.05, 0.1, 0.2} : betaValues;
+        gammaValues = (gammaValues == null || gammaValues.length == 0) ? new double[]{0.05, 0.1, 0.2, 0.3} : gammaValues;
+
+
+        for (double alpha : alphaValues) {
+            for (double beta : betaValues) {
+                for (double gamma : gammaValues) {
+                    try {
+                        validateSeasonalParameters(alpha, beta, gamma, seasonLength); // 提前验证
+
+                        double totalError = 0;
+                        int validFolds = 0;
+
+                        for (int fold = 0; fold < numFolds; fold++) {
+                            int validationStart = minTrainSize + fold * step;
+                            int validationEnd = Math.min(validationStart + validationWindowSize, trainingData.length);
+
+                            if (validationEnd - validationStart < Math.max(1, seasonLength / 4)) continue; // 验证集太小
+
+                            double[] foldTrainSet = Arrays.copyOfRange(trainingData, 0, validationStart);
+                            double[] foldValidationSet = Arrays.copyOfRange(trainingData, validationStart, validationEnd);
+
+                            // 训练模型
+                            HoltWintersForecast model = new HoltWintersForecast(alpha, beta, gamma, seasonLength, seasonalityType);
+                            // 注意：每次交叉验证都需要重新初始化和训练
+                            model.initializeSeasonalModel(foldTrainSet); // 使用部分数据初始化
+                            model.trainSeasonalModel(foldTrainSet);      // 使用相同数据训练
+
+                            // 预测
+                            double[] forecast = model.forecastSeasonal(foldValidationSet.length);
+
+                            // 计算误差
+                            double error = useMAE ? calculateMAE(foldValidationSet, forecast) : calculateMAPE(foldValidationSet, forecast);
+
+                            if (!Double.isNaN(error) && Double.isFinite(error)) {
+                                totalError += error;
+                                validFolds++;
+                            } else {
+                                // log.trace("Fold {} for params ({}, {}, {}) resulted in invalid error: {}", fold, alpha, beta, gamma, error);
+                            }
+                        }
+
+                        if (validFolds >= numFolds / 2) { // 至少一半折数有效
+                            double avgError = totalError / validFolds;
+                            if (avgError < bestAvgError) {
+                                bestAvgError = avgError;
+                                bestParams[0] = alpha;
+                                bestParams[1] = beta;
+                                bestParams[2] = gamma;
+                                // log.debug("New best seasonal params found: alpha={}, beta={}, gamma={}, AvgError={}", alpha, beta, gamma, avgError);
+                            }
+                        }
+                    } catch (IllegalArgumentException e) {
+                        // log.trace("跳过无效参数组合: alpha={}, beta={}, gamma={}", alpha, beta, gamma);
+                    } catch (Exception e) {
+                        log.warn("季节性参数优化中出现意外错误 (alpha={}, beta={}, gamma={}): {}", alpha, beta, gamma, e.getMessage());
+                    }
+                }
+            }
+        }
+
+        if (bestAvgError == Double.MAX_VALUE) {
+            log.warn("未能找到有效的季节性参数组合，将使用默认值或引发错误。");
+            // 可以选择返回默认值或抛出异常
+            // return new double[]{0.1, 0.05, 0.1}; // 示例默认值
+             throw new RuntimeException("未能找到有效的季节性参数组合");
+        }
+
+        log.info("季节性参数优化完成。最优参数: alpha={}, beta={}, gamma={}, 平均误差({}): {}",
+                bestParams[0], bestParams[1], bestParams[2], useMAE ? "MAE" : "MAPE", bestAvgError);
+
+        return bestParams;
+    }
+
+
+    /**
+     * 使用时间序列交叉验证为 Holt 非季节性模型找到最优参数 (alpha, beta)。
+     *
+     * @param trainingData 训练数据。
+     * @param alphaValues  Alpha 参数候选值数组。
+     * @param betaValues   Beta 参数候选值数组。
+     * @param useMAE       是否使用 MAE 代替 MAPE 进行评估。
+     * @return 包含最优 [alpha, beta] 的数组。
+     * @throws IllegalArgumentException 如果数据不足。
+     */
+    public static double[] findOptimalHoltParametersCV(double[] trainingData,
+                                                       double[] alphaValues,
+                                                       double[] betaValues,
+                                                       boolean useMAE) {
+        if (trainingData == null || trainingData.length < 15) { // Holt 需要的数据量相对较少
+            throw new IllegalArgumentException("Holt 参数优化需要至少 15 个数据点");
+        }
+
+        // 交叉验证设置
+        int minTrainSize = Math.max(10, trainingData.length / 3); // 最小训练集
+        int validationWindowSize = Math.max(5, trainingData.length / 5); // 验证窗口
+        int step = Math.max(1, validationWindowSize / 2); // 滑动步长
+        int numFolds = Math.max(3, (trainingData.length - minTrainSize - validationWindowSize) / step + 1);
+        numFolds = Math.min(numFolds, 10); // 限制最大折数
+
+        log.info("开始 Holt 非季节性参数优化 ({} 折交叉验证, 评估指标: {})...", numFolds, useMAE ? "MAE" : "MAPE");
+
+        double bestAvgError = Double.MAX_VALUE;
+        double[] bestParams = new double[2]; // [alpha, beta]
+
+        // 默认参数范围
+        alphaValues = (alphaValues == null || alphaValues.length == 0) ? IntStream.rangeClosed(1, 10).mapToDouble(i -> i * 0.1).toArray() : alphaValues;
+        betaValues = (betaValues == null || betaValues.length == 0) ? IntStream.rangeClosed(0, 10).mapToDouble(i -> i * 0.1).toArray() : betaValues;
+
+
+        for (double alpha : alphaValues) {
+            for (double beta : betaValues) {
+                try {
+                    validateNonSeasonalParameters(alpha, beta); // 提前验证
+
+                    double totalError = 0;
+                    int validFolds = 0;
+
+                    for (int fold = 0; fold < numFolds; fold++) {
+                        int validationStart = minTrainSize + fold * step;
+                        int validationEnd = Math.min(validationStart + validationWindowSize, trainingData.length);
+
+                        if (validationEnd - validationStart < 3) continue; // 验证集至少需要3个点
+
+                        double[] foldTrainSet = Arrays.copyOfRange(trainingData, 0, validationStart);
+                        double[] foldValidationSet = Arrays.copyOfRange(trainingData, validationStart, validationEnd);
+
+                        // 使用当前参数进行预测
+                        double[] forecast = forecastHoltNonSeasonal(foldTrainSet, foldValidationSet.length, alpha, beta);
+
+                        // 计算误差
+                        double error = useMAE ? calculateMAE(foldValidationSet, forecast) : calculateMAPE(foldValidationSet, forecast);
+
+                        if (!Double.isNaN(error) && Double.isFinite(error)) {
+                            totalError += error;
+                            validFolds++;
+                        } else {
+                           // log.trace("Fold {} for Holt params ({}, {}) resulted in invalid error: {}", fold, alpha, beta, error);
+                        }
+                    }
+
+                    if (validFolds >= numFolds / 2) {
+                        double avgError = totalError / validFolds;
+                        if (avgError < bestAvgError) {
+                            bestAvgError = avgError;
+                            bestParams[0] = alpha;
+                            bestParams[1] = beta;
+                            // log.debug("New best Holt params found: alpha={}, beta={}, AvgError={}", alpha, beta, avgError);
+                        }
+                    }
+                } catch (IllegalArgumentException e) {
+                   // log.trace("跳过无效 Holt 参数组合: alpha={}, beta={}", alpha, beta);
+                } catch (Exception e) {
+                    log.warn("Holt 参数优化中出现意外错误 (alpha={}, beta={}): {}", alpha, beta, e.getMessage());
+                }
+            }
+        }
+
+         if (bestAvgError == Double.MAX_VALUE) {
+            log.warn("未能找到有效的 Holt 参数组合，将使用默认值或引发错误。");
+            // return new double[]{0.2, 0.1}; // 示例默认值
+             throw new RuntimeException("未能找到有效的 Holt 参数组合");
+        }
+
+        log.info("Holt 非季节性参数优化完成。最优参数: alpha={}, beta={}, 平均误差({}): {}",
+                bestParams[0], bestParams[1], useMAE ? "MAE" : "MAPE", bestAvgError);
+
+        return bestParams;
+    }
+
+
+    // #########################################################################
+    // # Evaluation Metrics (Static Methods)
+    // #########################################################################
+
+    /**
+     * 计算平均绝对百分比误差 (MAPE)。
+     * 注意：对 0 或接近 0 的实际值非常敏感。
+     *
+     * @param actual   实际值数组。
+     * @param forecast 预测值数组。
+     * @return MAPE 值 (0-100)，如果无法计算则返回 NaN。
+     * @throws IllegalArgumentException 如果数组长度不匹配。
+     */
+    public static double calculateMAPE(double[] actual, double[] forecast) {
+        if (actual == null || forecast == null || actual.length != forecast.length) {
+            throw new IllegalArgumentException("实际值和预测值数组必须非空且长度相同");
+        }
+        if (actual.length == 0) return Double.NaN; // 或 0
+
+        double sumPercentageError = 0;
+        int count = 0;
+        for (int i = 0; i < actual.length; i++) {
+            if (Math.abs(actual[i]) > 1e-6) { // 避免除以非常接近零的数
+                sumPercentageError += Math.abs((actual[i] - forecast[i]) / actual[i]);
+                count++;
+            }
+        }
+        // 如果所有实际值都接近于0，MAPE可能无意义
+        return (count > 0) ? (sumPercentageError / count) * 100.0 : Double.NaN;
+    }
+
+    /**
+     * 计算均方根误差 (RMSE)。
+     *
+     * @param actual   实际值数组。
+     * @param forecast 预测值数组。
+     * @return RMSE 值。
+     * @throws IllegalArgumentException 如果数组长度不匹配。
+     */
+    public static double calculateRMSE(double[] actual, double[] forecast) {
+        if (actual == null || forecast == null || actual.length != forecast.length) {
+            throw new IllegalArgumentException("实际值和预测值数组必须非空且长度相同");
+        }
+        if (actual.length == 0) return Double.NaN; // 或 0
+
+        double sumSquaredError = 0;
+        for (int i = 0; i < actual.length; i++) {
+            double error = actual[i] - forecast[i];
+            sumSquaredError += error * error;
+        }
+        return Math.sqrt(sumSquaredError / actual.length);
+    }
+
+    /**
+     * 计算平均绝对误差 (MAE)。对异常值和零值比 RMSE 和 MAPE 更不敏感。
+     *
+     * @param actual   实际值数组。
+     * @param forecast 预测值数组。
+     * @return MAE 值。
+     * @throws IllegalArgumentException 如果数组长度不匹配。
+     */
+    public static double calculateMAE(double[] actual, double[] forecast) {
+        if (actual == null || forecast == null || actual.length != forecast.length) {
+            throw new IllegalArgumentException("实际值和预测值数组必须非空且长度相同");
+        }
+        if (actual.length == 0) return Double.NaN; // 或 0
+
+        double sumAbsError = 0;
+        for (int i = 0; i < actual.length; i++) {
+            sumAbsError += Math.abs(actual[i] - forecast[i]);
+        }
+        return sumAbsError / actual.length;
+    }
+
+
+    // #########################################################################
+    // # Utility Methods (Static)
+    // #########################################################################
+
+     /**
+     * 对原始数据应用简单的移动平均平滑处理。
+     *
+     * @param rawData    原始数据数组。
+     * @param windowSize 移动平均窗口大小。
+     * @return 平滑处理后的数据数组。
+     */
+    public static double[] applySimpleMovingAverage(double[] rawData, int windowSize) {
+        if (rawData == null || rawData.length == 0) {
+            return new double[0];
+        }
+        if (windowSize <= 0) {
+            throw new IllegalArgumentException("窗口大小必须为正数");
+        }
+        if (windowSize == 1) {
+            return Arrays.copyOf(rawData, rawData.length); // 无需平滑
+        }
+
+        double[] smoothedData = new double[rawData.length];
+        double currentSum = 0;
+        int count = 0;
+
+        for (int i = 0; i < rawData.length; i++) {
+            currentSum += rawData[i];
+            count++;
+
+            if (i >= windowSize) {
+                currentSum -= rawData[i - windowSize]; // 移除窗口外的最旧数据
+                count--; // 理论上 count 应该等于 windowSize，但这样写更安全
+            }
+
+            // 对窗口内数据计算平均值
+            smoothedData[i] = currentSum / count;
+        }
+
+        return smoothedData;
+    }
+
+
+    /**
+     * 获取模型评估指标 (如果模型实例被训练过)。
+     *
+     * @return 包含各项评估指标的数组 [MAPE, RMSE, MAE]，如果未训练则抛出异常。
+     * @throws IllegalStateException 如果模型实例未被训练。
+     */
+    public double[] getSeasonalModelMetrics() {
+        if (fittedValues == null || residuals == null || lastObservationIndex < 0) {
+            throw new IllegalStateException("季节性模型尚未训练或无拟合/残差数据");
+        }
+
+        // 从拟合值和残差中恢复实际值
         double[] actualValues = new double[fittedValues.length];
         for (int i = 0; i < fittedValues.length; i++) {
             actualValues[i] = fittedValues[i] + residuals[i];
@@ -512,449 +689,83 @@ public class HoltWintersForecast {
     }
 
     /**
-     * 获取当前模型参数
+     * 获取当前季节性模型实例的参数。
      *
-     * @return 模型参数字符串
+     * @return 模型参数的字符串表示。
      */
-    public String getModelParameters() {
-        return String.format("模型类型: %s\nAlpha: %.4f, Beta: %.4f, Gamma: %.4f\n" +
-                        "水平值: %.4f, 趋势值: %.4f\n季节性因子: %s",
-                seasonalityType, alpha, beta, gamma,
+    public String getSeasonalModelParameters() {
+         if (!initialized) {
+            return "季节性模型未初始化";
+        }
+        return String.format("模型类型: %s, 季节长度: %d\nAlpha: %.4f, Beta: %.4f, Gamma: %.4f\n" +
+                        "当前 Level: %.4f, 当前 Trend: %.4f\n当前季节性因子: %s",
+                seasonalityType, seasonLength, alpha, beta, gamma,
                 level, trend, Arrays.toString(seasonal));
     }
 
-    /**
-     * 获取拟合值
-     */
-    public double[] getFittedValues() {
-        return fittedValues;
-    }
+    // --- 移除或注释掉不再需要的旧方法 ---
+    /*
+    public static double[] findOptimalParameters(...) // 旧的优化方法
+    public static double[] findOptimalParametersWithCV(...) // 旧的优化方法
+    public double[] forecast(int periods) // 旧的实例预测方法
+    public void train(double[] trainingData) // 旧的实例训练方法
+    public boolean initialize(double[] historicalData) // 旧的实例初始化方法
+    public static HoltWintersForecast createOptimizedModel(...) // 旧的便捷创建方法
+    public static double[] dailyForecast(...) // 旧的统一入口方法
+    public static boolean shouldUseSeasonalModel(...) // 职责转移到策略类
+    public static double[] findOptimalHoltParameters(...) // 旧的Holt优化
+    public static double[] findOptimalHoltParametersWithCV(...) // 旧的Holt优化CV
+    public static double[] forecastWithHoltMethod(...) // 旧的Holt预测入口
+    */
 
     /**
-     * 获取残差
-     */
-    public double[] getResiduals() {
-        return residuals;
-    }
-
-    /**
-     * 导出预测结果
-     *
-     * @param periods  预测期数
-     * @param forecast 预测结果
-     * @param labels   时间标签(可选)
-     * @return 预测结果字符串
-     */
-    public static String exportForecast(int periods, double[] forecast, String[] labels) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("周期,预测值\n");
-
-        for (int i = 0; i < periods; i++) {
-            String periodLabel = (labels != null && i < labels.length) ? labels[i] : String.valueOf(i + 1);
-            sb.append(periodLabel)
-              .append(",")
-              .append(String.format("%.2f", forecast[i]))
-              .append("\n");
-        }
-
-        return sb.toString();
-    }
-
-    /**
-     * 便利方法：创建日期标签
-     *
-     * @param startYear  起始年份
-     * @param startMonth 起始月份(1-12)
-     * @param startDay   起始日(1-31)
-     * @param periods    期数
-     * @return 时间标签数组
-     */
-    public static String[] createDailyLabels(int startYear, int startMonth, int startDay, int periods) {
-        String[] labels = new String[periods];
-
-        // 简化版日期生成，不考虑月份天数变化等复杂情况
-        for (int i = 0; i < periods; i++) {
-            int day = startDay + i;
-            int month = startMonth;
-            int year = startYear;
-
-            // 简单处理月份进位(忽略闰年和不同月份天数)
-            while (day > 30) {
-                day -= 30;
-                month++;
-            }
-
-            while (month > 12) {
-                month -= 12;
-                year++;
-            }
-
-            labels[i] = year + "-" + String.format("%02d", month) + "-" + String.format("%02d", day);
-        }
-
-        return labels;
-    }
-
-    /**
-     * 便捷方法：自动选择最优参数并创建模型（针对日度数据优化参数范围）
-     *
-     * @param data            历史数据
-     * @param seasonLength    季节长度
-     * @param seasonalityType 季节性类型
-     * @return 优化后的模型
-     */
-    public static HoltWintersForecast createOptimizedModel(double[] data, int seasonLength,
-                                                           SeasonalityType seasonalityType) {
-        // 针对日度数据优化的参数网格
-        double[] alphaValues = {0.01, 0.03, 0.05, 0.08, 0.1, 0.15, 0.2};
-        double[] betaValues = {0.0, 0.01, 0.02, 0.05, 0.08, 0.1};
-        double[] gammaValues = {0.01, 0.03, 0.05, 0.08, 0.1, 0.15};
-
-        // 使用交叉验证查找最优参数
-        double[] optimalParams = findOptimalParametersWithCV(data, alphaValues, betaValues, gammaValues,
-                seasonLength, seasonalityType);
-
-        // 创建并训练模型
-        HoltWintersForecast model = new HoltWintersForecast(
-                optimalParams[0], optimalParams[1], optimalParams[2], seasonLength, seasonalityType);
-        model.train(data);
-
-        return model;
-    }
-
-    /**
-     * 对原始数据进行七日移动平均处理
-     *
-     * @param rawData 原始数据
-     * @return 处理后的数据
-     */
-    public static double[] applyMovingAverage(double[] rawData) {
-        int windowSize = 14;
-        // 参数校验
-        if (rawData == null || rawData.length == 0 || windowSize < 1) {
-            return new double[0];
-        }
-
-        // 特殊处理窗口大小为1的情况
-        if (windowSize == 1) {
-            return Arrays.copyOf(rawData, rawData.length);
-        }
-
-        double[] smoothedData = new double[rawData.length];
-        final int maxInitialDays = Math.min(windowSize - 1, rawData.length);
-
-        // 前N-1天使用累积平均
-        for (int i = 0; i < maxInitialDays; i++) {
-            double sum = 0;
-            for (int j = 0; j <= i; j++) {
-                sum += rawData[j];
-            }
-            smoothedData[i] = sum / (i + 1);
-        }
-
-        // 从第N天开始使用完整窗口平均
-        for (int i = windowSize - 1; i < rawData.length; i++) {
-            double sum = 0;
-            // 计算窗口内数据的和
-            for (int j = i - windowSize + 1; j <= i; j++) {
-                sum += rawData[j];
-            }
-            smoothedData[i] = sum / windowSize;
-        }
-
-        return smoothedData;
-    }
-
-    /**
-     * 判断是否应使用季节性模型
-     *
-     * @param data              历史数据
-     * @param dailySeasonLength 日度季节周期长度(通常是365)
-     * @return 是否应使用季节性模型
-     */
-    public static boolean shouldUseSeasonalModel(double[] data, int dailySeasonLength) {
-        // 仅当数据量超过一年时才使用季节性模型
-        return data.length >= dailySeasonLength;
-    }
-
-    /**
-     * 为Holt双指数平滑方法寻找最优参数
-     *
-     * @param trainingData 训练数据
-     * @return 最优[alpha, beta]参数数组
-     */
-    public static double[] findOptimalHoltParameters(double[] trainingData) {
-        if (trainingData.length < 15) { // 至少需要30天数据进行优化
-            throw new IllegalArgumentException("Holt参数优化需要至少30天数据");
-        }
-
-        // 将数据分为训练集和验证集(80%训练，20%验证)
-        int validationStart = (int) (trainingData.length * 0.8);
-        double[] trainSet = Arrays.copyOfRange(trainingData, 0, validationStart);
-
-        double[] validationSet = Arrays.copyOfRange(trainingData, Math.max(10, validationStart), trainingData.length);
-
-
-        double[] alphaValues = IntStream.rangeClosed(1, 100)
-                                        .mapToDouble(v -> v * 0.01)
-                                        .toArray();
-        double[] betaValues = IntStream.rangeClosed(1, 100)
-                                       .mapToDouble(v -> v * 0.01)
-                                       .toArray();
-        double bestMAE = Double.MAX_VALUE;  // 使用MAE代替MAPE，对零值和小值更友好
-        double[] bestParams = new double[2];
-
-        // 网格搜索
-        for (double alpha : alphaValues) {
-            for (double beta : betaValues) {
-                try {
-                    // 使用当前参数进行预测
-                    double[] forecast = forecastWithHoltMethod(trainSet, validationSet.length, alpha, beta);
-
-                    // 计算MAE
-                    double mae = calculateMAE(validationSet, forecast);
-                    double rmse = calculateRMSE(validationSet, forecast);
-                    double a = rmse / mae;
-                    // 更新最优参数
-                    if (mae < bestMAE&& a<1.5) {
-                        bestMAE = mae;
-                        bestParams[0] = alpha;
-                        bestParams[1] = beta;
-                    }
-                } catch (Exception e) {
-                    // 忽略无效参数组合
-                    System.err.println("无效Holt参数组合: " + alpha + ", " + beta + " - " + e.getMessage());
-                }
-            }
-        }
-
-        System.out.println("Holt最优参数: alpha=" + bestParams[0] +
-                ", beta=" + bestParams[1] + ", MAE=" + bestMAE);
-
-        return bestParams;
-    }
-
-    /**
-     * 为Holt双指数平滑方法寻找最优参数(使用交叉验证)
-     * 
-     * @param trainingData 训练数据
-     * @return 最优[alpha, beta]参数数组
-     */
-    public static double[] findOptimalHoltParametersWithCV(double[] trainingData) {
-        if (trainingData.length < 15) { // 至少需要30天数据
-            throw new IllegalArgumentException("Holt参数优化需要至少30天数据");
-        }
-
-        // 设置交叉验证参数
-        int minTrainSize = Math.max(15, trainingData.length / 3); // 最小训练集大小
-        int windowSize = Math.max(5, trainingData.length / 10); // 验证窗口大小
-        int step = Math.max(1, windowSize / 2); // 滑动步长
-        int numFolds = (trainingData.length - minTrainSize - windowSize) / step + 1;
-        
-        // 限制折数
-        numFolds = Math.min(numFolds, 10);
-        numFolds = Math.max(numFolds, 3); // 至少3折
-        
-        System.out.println("执行" + numFolds + "折时间序列交叉验证(Holt方法)...");
-
-        // 参数网格可以减少密度以提高速度
-        double[] alphaValues = new double[20]; // 减少到20个点
-        double[] betaValues = new double[20];  // 减少到20个点
-        
-        for (int i = 0; i < 20; i++) {
-            alphaValues[i] = (i + 1) * 0.05; // 0.05到1.0, 步长0.05
-            betaValues[i] = i * 0.05;        // 0.0到0.95, 步长0.05
-        }
-
-        double bestMAE = Double.MAX_VALUE;
-        double[] bestParams = new double[2];
-
-        // 网格搜索
-        for (double alpha : alphaValues) {
-            for (double beta : betaValues) {
-                try {
-                    double totalMAE = 0;
-                    int validFolds = 0;
-
-                    // 对每个交叉验证折进行评估
-                    for (int fold = 0; fold < numFolds; fold++) {
-                        int validationStart = minTrainSize + fold * step;
-                        int validationEnd = Math.min(validationStart + windowSize, trainingData.length);
-                        
-                        if (validationEnd - validationStart < 3) { // 验证集至少需要3个点
-                            continue;
-                        }
-
-                        double[] foldTrainSet = Arrays.copyOfRange(trainingData, 0, validationStart);
-                        double[] foldValidationSet = Arrays.copyOfRange(trainingData, validationStart, validationEnd);
-
-                        // 使用当前参数进行预测
-                        double[] forecast = forecastWithHoltMethod(foldTrainSet, foldValidationSet.length, alpha, beta);
-
-                        // 计算MAE
-                        double foldMAE = calculateMAE(foldValidationSet, forecast);
-                        
-                        // 计算RMSE用于筛选异常比例
-                        double foldRMSE = calculateRMSE(foldValidationSet, forecast);
-                        double rmseToMaeRatio = foldRMSE / foldMAE;
-                        
-                        // 只有当RMSE/MAE比例合理时才计入总误差
-                        if (rmseToMaeRatio < 1.5) {
-                            totalMAE += foldMAE;
-                            validFolds++;
-                        }
-                    }
-
-                    // 计算平均MAE
-                    double averageMAE = validFolds > 0 ? totalMAE / validFolds : Double.MAX_VALUE;
-
-                    // 更新最优参数
-                    if (validFolds >= numFolds / 2 && averageMAE < bestMAE) {
-                        bestMAE = averageMAE;
-                        bestParams[0] = alpha;
-                        bestParams[1] = beta;
-                    }
-                } catch (Exception e) {
-                    // 忽略无效参数组合
-                    System.err.println("无效Holt参数组合: " + alpha + ", " + beta + " - " + e.getMessage());
-                }
-            }
-        }
-
-        System.out.println("Holt交叉验证最优参数: alpha=" + bestParams[0] +
-                ", beta=" + bestParams[1] + ", 平均MAE=" + bestMAE);
-
-        return bestParams;
-    }
-
-    /**
-     * 使用双指数平滑(Holt)方法预测(无季节性)
-     *
-     * @param data    历史数据
-     * @param periods 预测期数
-     * @return 预测结果
-     */
-    public static double[] forecastWithHoltMethod(double[] data, int periods) {
-        if (data == null || data.length < 2) {
-            throw new IllegalArgumentException("Holt预测至少需要2个数据点");
-        }
-
-        // 寻找最优参数(使用交叉验证)
-        double[] optimalParams = findOptimalHoltParametersWithCV(data);
-
-        double alpha = optimalParams[0];
-        double beta = optimalParams[1];
-
-        return forecastWithHoltMethod(data, periods, alpha, beta);
-    }
-
-    /**
-     * 使用双指数平滑(Holt)方法预测(无季节性)，使用指定参数
-     *
-     * @param data    历史数据
-     * @param periods 预测期数
-     * @param alpha   水平平滑系数
-     * @param beta    趋势平滑系数
-     * @return 预测结果
-     */
-    public static double[] forecastWithHoltMethod(double[] data, int periods, double alpha, double beta) {
-        if (data == null || data.length < 2) {
-            throw new IllegalArgumentException("Holt预测至少需要2个数据点");
-        }
-
-        // 初始化水平和趋势
-        double level = data[0];
-        double trend = data.length > 1 ? data[1] - data[0] : 0;
-
-        // 根据历史数据更新水平和趋势
-        for (int i = 1; i < data.length; i++) {
-            double prevLevel = level;
-            level = alpha * data[i] + (1 - alpha) * (level + trend);
-            trend = beta * (level - prevLevel) + (1 - beta) * trend;
-        }
-
-        // 预测
-        double[] forecast = new double[periods];
-        for (int i = 0; i < periods; i++) {
-            forecast[i] = level + (i + 1) * trend;
-            if (forecast[i] < 0) forecast[i] = 0; // 确保预测值非负
-        }
-
-        return forecast;
-    }
-
-    /**
-     * 日度预测的统一入口
-     *
-     * @param rawData      原始历史数据
-     * @param forecastDays 预测天数
-     * @return 预测结果
-     */
-    public static double[] dailyForecast(double[] rawData, int forecastDays) {
-        if (rawData == null || rawData.length == 0) {
-            throw new IllegalArgumentException("历史数据不能为空");
-        }
-
-        // 1. 应用七日移动平均平滑处理
-        // double[] smoothedData = applyMovingAverage(rawData);
-        double[] smoothedData = rawData;
-
-        // 2. 判断是否使用季节性模型
-        int dailySeasonLength = 365; // 年度季节性
-        boolean useSeasonalModel = shouldUseSeasonalModel(smoothedData, dailySeasonLength);
-
-        // 3. 选择合适的预测方法
-        if (useSeasonalModel) {
-            System.out.println("数据长度超过一年，使用Holt-Winters三重指数平滑(季节性)模型");
-
-            try {
-                // 对于日度数据推荐使用加法模型，尤其是零值较多的情况
-                HoltWintersForecast model = createOptimizedModel(
-                        smoothedData, dailySeasonLength, SeasonalityType.ADDITIVE);
-
-                // 输出模型评估指标
-                double[] metrics = model.getModelMetrics();
-                System.out.println("Holt-Winters模型评估：MAPE=" + metrics[0] +
-                        ", RMSE=" + metrics[1] + ", MAE=" + metrics[2]);
-
-                return model.forecast(forecastDays);
-            } catch (Exception e) {
-                // 如果季节性模型失败，降级到非季节性模型
-                System.out.println("季节性模型失败，原因: " + e.getMessage());
-                System.out.println("降级使用Holt双指数平滑模型");
-                return forecastWithHoltMethod(smoothedData, forecastDays);
-            }
-        } else {
-            System.out.println("数据长度不足一年，使用Holt双指数平滑(非季节性)模型");
-            return forecastWithHoltMethod(smoothedData, forecastDays);
-        }
-    }
-
-    /**
-     * 使用示例
+     * 使用示例 (可保留用于单独测试核心算法)
      */
     public static void main(String[] args) {
+        // 示例：测试季节性模型
+        System.out.println("=============== 季节性模型测试 ===============");
+        double[] seasonalData = { /* ... 提供至少两个季节的数据 ... */ 8, 12, 15, 10, 8, 12, 15, 10, 9, 13, 16, 11 }; // 示例月度数据, season=4
+        int seasonLength = 4;
+        try {
+            // 1. 优化参数
+            double[] optimalParams = findOptimalSeasonalParametersCV(seasonalData, null, null, null, seasonLength, SeasonalityType.ADDITIVE, true);
+            // 2. 创建模型实例
+            HoltWintersForecast seasonalModel = new HoltWintersForecast(optimalParams[0], optimalParams[1], optimalParams[2], seasonLength, SeasonalityType.ADDITIVE);
+            // 3. 初始化和训练
+            seasonalModel.initializeSeasonalModel(seasonalData);
+            seasonalModel.trainSeasonalModel(seasonalData); // 再次训练以更新状态
+            // 4. 预测
+            int forecastPeriods = 8;
+            double[] seasonalForecast = seasonalModel.forecastSeasonal(forecastPeriods);
+            System.out.println("季节性预测结果: " + Arrays.toString(seasonalForecast));
+            System.out.println("模型参数:\n" + seasonalModel.getSeasonalModelParameters());
 
-        // 演示日度销售数据预测
-        System.out.println("=============== 日度销售数据预测示例 ===============");
+        } catch (Exception e) {
+            System.err.println("季节性模型测试失败: " + e.getMessage());
+            e.printStackTrace();
+        }
 
-        // 一年零两个月的日度销售数据示例(简化为随机数据)
-        double[] dailySalesHistory = new double[]{8.0, 2.0, 8.0, 6.0, 11.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0, 4.0, 3.0, 0.0, 2.0, 0.0, 1.0, 5.0, 3.0, 0.0, 0.0, 0.0, 1.0, 0.0, 2.0, 9.0, 2.0, 12.0, 9.0, 3.0, 4.0, 0.0, 2.0, 5.0, 6.0, 5.0, 4.0, 5.0, 6.0, 11.0, 2.0, 13.0, 7.0, 4.0, 3.0, 5.0, 13.0, 8.0, 2.0, 11.0, 4.0, 0.0, 6.0, 13.0, 6.0, 8.0, 9.0, 21.0, 1.0, 2.0, 1.0, 5.0, 11.0, 0.0, 2.0, 23.0, 9.0, 7.0, 13.0, 12.0, 1.0, 9.0, 2.0, 0.0, 6.0, 30.0, 6.0, 12.0, 1.0, 6.0, 5.0, 4.0, 1.0, 21.0, 16.0, 14.0, 1.0, 22.0, 5.0, 8.0, 8.0, 6.0, 9.0, 7.0, 5.0, 19.0, 20.0, 30.0, 12.0, 11.0, 3.0, 16.0, 4.0, 0.0, 1.0, 8.0, 23.0, 0.0, 36.0, 12.0, 2.0, 9.0, 0.0, 18.0, 13.0, 6.0, 7.0, 21.0, 0.0, 3.0, 13.0, 1.0, 25.0, 24.0, 0.0, 3.0, 13.0, 4.0, 9.0, 20.0, 0.0, 29.0, 17.0, 19.0, 5.0, 0.0, 18.0, 8.0, 10.0, 0.0, 12.0, 21.0, 10.0, 8.0, 18.0, 0.0, 4.0, 8.0, 0.0, 6.0, 6.0, 7.0, 22.0, 0.0, 0.0, 7.0, 2.0, 16.0, 7.0, 7.0, 18.0, 26.0, 2.0, 13.0, 4.0, 20.0, 8.0, 6.0, 5.0, 1.0, 12.0, 7.0, 0.0, 12.0, 31.0, 0.0, 18.0, 15.0, 19.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0, 30.0, 25.0, 11.0, 11.0, 6.0, 9.0, 15.0, 4.0, 23.0, 0.0, 13.0, 6.0, 14.0, 27.0, 5.0, 2.0, 13.0, 3.0, 0.0, 1.0, 14.0, 0.0, 16.0, 5.0, 15.0, 0.0, 14.0, 7.0, 10.0, 13.0, 21.0, 8.0, 4.0, 7.0, 13.0, 28.0, 19.0, 0.0, 10.0, 2.0, 14.0, 14.0, 9.0, 2.0, 3.0, 0.0, 9.0, 4.0, 0.0, 4.0, 11.0, 25.0, 20.0, 13.0, 5.0, 17.0, 7.0, 10.0, 3.0, 3.0, 21.0, 3.0, 8.0, 10.0, 2.0, 27.0, 20.0, 13.0, 11.0, 12.0, 0.0, 10.0, 10.0, 5.0, 5.0, 8.0, 12.0, 5.0, 10.0, 16.0, 12.0, 0.0, 13.0, 7.0, 3.0, 15.0, 5.0, 0.0, 0.0, 10.0, 17.0, 9.0, 2.0, 21.0, 3.0, 8.0, 0.0, 0.0, 10.0, 3.0, 13.0, 7.0, 9.0, 13.0, 15.0, 0.0, 0.0, 14.0, 12.0, 15.0, 11.0, 5.0, 0.0, 0.0, 11.0, 13.0, 9.0, 1.0, 1.0, 7.0, 0.0, 4.0, 15.0, 3.0, 29.0, 0.0, 17.0, 3.0, 8.0, 14.0, 2.0, 17.0, 14.0, 2.0, 8.0, 3.0, 0.0, 5.0, 14.0, 7.0, 4.0, 5.0, 5.0, 12.0, 8.0, 1.0, 11.0, 0.0, 3.0, 4.0, 1.0, 5.0, 4.0, 0.0, 5.0, 6.0, 0.0, 12.0, 7.0, 0.0, 24.0, 8.0, 7.0, 11.0, 3.0, 2.0, 4.0, 12.0, 0.0, 0.0, 0.0, 3.0, 14.0, 9.0, 4.0, 2.0, 19.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 2.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0, 7.0, 0.0, 15.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 7.0, 2.0, 8.0, 0.0, 8.0, 0.0, 0.0, 1.0, 6.0}; // 一年零两个月
-        // 3个月的日度销售数据
-        double[] shortTermData = Arrays.copyOfRange(dailySalesHistory, dailySalesHistory.length - 100, dailySalesHistory.length);
-        System.out.println(Arrays.toString(shortTermData));
+        // 示例：测试非季节性模型 (Holt)
+        System.out.println("\n=============== 非季节性模型 (Holt) 测试 ===============");
+        double[] nonSeasonalData = { 10, 12, 13, 16, 19, 23, 26, 30, 29, 32, 31, 35, 38, 40 };
+        try {
+            // 1. 优化参数
+            double[] optimalHoltParams = findOptimalHoltParametersCV(nonSeasonalData, null, null, true);
+            // 2. 预测
+            int holtForecastPeriods = 5;
+            double[] holtForecast = forecastHoltNonSeasonal(nonSeasonalData, holtForecastPeriods, optimalHoltParams[0], optimalHoltParams[1]);
+            System.out.println("Holt 非季节性预测结果: " + Arrays.toString(holtForecast));
+        } catch (Exception e) {
+            System.err.println("Holt 非季节性模型测试失败: " + e.getMessage());
+            e.printStackTrace();
+        }
 
-        // 预测未来30天销量
-        int futureDays = 30;
-        double[] futureSales = dailyForecast(shortTermData, futureDays);
-
-        // 创建时间标签(假设从2023年1月1日开始)
-        String[] forecastLabels = createDailyLabels(2024, 1, 1 + shortTermData.length, futureDays);
-
-        // 输出预测结果
-        System.out.println("\n未来30天销量预测结果:");
-        System.out.println(exportForecast(futureDays, futureSales, forecastLabels));
-
-
+        // 示例：测试移动平均
+        System.out.println("\n=============== 移动平均测试 ===============");
+        double[] maData = {2, 4, 6, 8, 10, 12, 14, 16, 18, 20};
+        int window = 3;
+        double[] smoothed = applySimpleMovingAverage(maData, window);
+        System.out.println("原始数据: " + Arrays.toString(maData));
+        System.out.println(window + "期移动平均: " + Arrays.toString(smoothed));
     }
 }

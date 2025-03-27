@@ -94,35 +94,13 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
 
 
     @Override
-    public JPAQuery<Shop> buildBaseQuery(ShopQuery query) {
+    public JPAQuery<Shop> buildConditionQuery(ShopQuery query) {
         JPAQuery<Shop> jpaQuery = queryFactory
                 .selectFrom(shop)
                 .distinct();
 
-        // 处理关联
-        if (query.getIncludes()
-                 .contains(ShopQuery.Include.PRICE_RULE)) {
-            jpaQuery.leftJoin(shop.priceRule, priceRule)
-                    .fetchJoin();
-
-            // 处理关联
-            if (query.getIncludes()
-                     .contains(ShopQuery.Include.PRICE_RULE_DETAIL)) {
-                jpaQuery.leftJoin(priceRule.priceRuleDetails, priceRuleDetail)
-                        .fetchJoin();
-                if (query.getIncludes()
-                         .contains(ShopQuery.Include.PRODUCT)) {
-                    jpaQuery.leftJoin(priceRuleDetail.product, product)
-                            .fetchJoin();
-                }
-
-            }
-        }
-
-
         // 处理查询条件
         BooleanBuilder where = new BooleanBuilder();
-
 
         if (query.getId() != null) {
             where.and(shop.id.eq(query.getId()));
@@ -143,9 +121,7 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
                 where.and(shop.latitude.isNull()
                                        .and(shop.longitude.isNull()));
             }
-
         }
-
 
         if (query.getPinyin() != null) {
             where.and(shop.pinyin.eq(query.getPinyin()));
@@ -165,7 +141,28 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
         return jpaQuery
                 .where(where)
                 .orderBy(shop.createTime.desc());
+    }
 
+    @Override
+    public void buildRelationship(ShopQuery query, JPAQuery<Shop> jpaQuery) {
+        // 处理关联
+        if (query.getIncludes()
+                 .contains(ShopQuery.Include.PRICE_RULE)) {
+            jpaQuery.leftJoin(shop.priceRule, priceRule)
+                    .fetchJoin();
+
+            // 处理关联
+            if (query.getIncludes()
+                     .contains(ShopQuery.Include.PRICE_RULE_DETAIL)) {
+                jpaQuery.leftJoin(priceRule.priceRuleDetails, priceRuleDetail)
+                        .fetchJoin();
+                if (query.getIncludes()
+                         .contains(ShopQuery.Include.PRODUCT)) {
+                    jpaQuery.leftJoin(priceRuleDetail.product, product)
+                            .fetchJoin();
+                }
+            }
+        }
     }
 
     /**

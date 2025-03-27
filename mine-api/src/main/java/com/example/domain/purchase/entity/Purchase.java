@@ -29,7 +29,7 @@ public class Purchase {
     private BigDecimal totalAmount;
 
     @ToString.Exclude
-    @OneToMany(mappedBy = "purchase")
+    @OneToMany(mappedBy = "purchase", cascade = CascadeType.ALL)
     private List<PurchaseDetail> purchaseDetails;
 
     @Column(name = "in_time")

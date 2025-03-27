@@ -1,9 +1,6 @@
 server:
   port: 8085
-  #  开启gzip压缩
-  compression:
-    enabled: true
-    mime-types: application/javascript,text/css,application/json,application/xml,text/html,text/xml,text/plain
+
   #  controller全局前置路径
   servlet:
     context-path: /api
@@ -21,7 +18,7 @@ spring:
         format_sql: true
     #        enable_lazy_load_no_trans: false
     #    控制台打印jpa执行的sql
-    show-sql: true
+    show-sql: false
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -66,4 +63,8 @@ springdoc:
     path: /swagger-ui
 
 
+
+logging:
+  level:
+    com.example: debug
 

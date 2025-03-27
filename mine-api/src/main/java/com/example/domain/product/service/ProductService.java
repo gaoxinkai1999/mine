@@ -137,30 +137,19 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
     }
 
     /**
-     * 重写构建基础查询方法
-     * 根据传入的查询对象构建一个基础的JPA查询
-     * 主要处理查询条件、关联和排序
+     * 构建基本条件查询方法
+     * 根据传入的查询对象构建一个包含基本条件的JPA查询
      *
-     * @param query 查询条件对象，包含了一系列查询条件和参数
-     * @return 返回一个JPAQuery对象，用于执行查询操作
+     * @param query 查询条件对象，包含了一系列查询条件
+     * @return 返回一个包含基本条件的JPAQuery对象
      */
     @Override
-    public JPAQuery<Product> buildBaseQuery(ProductQuery query) {
+    public JPAQuery<Product> buildConditionQuery(ProductQuery query) {
         QProduct product = QProduct.product; // 查询产品的QueryDSL对象
-        QCategory category = QCategory.category; // 查询类别的QueryDSL对象
+        
         // 创建一个选择所有字段的查询，并确保结果唯一
         JPAQuery<Product> jpaQuery = queryFactory.selectFrom(product)
                                                  .distinct();
-
-        // 处理关联
-        //// 如果查询条件中包含类别信息，则进行左连接并即时加载
-        // if (query.getIncludes()
-        //         .contains(ProductQuery.Include.CATEGORY)) {
-        //
-        //}
-        // 默认加载类别
-        jpaQuery.leftJoin(product.category, category)
-                .fetchJoin();
 
         // 初始化查询条件构建器
         BooleanBuilder where = new BooleanBuilder();
@@ -197,6 +186,24 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
                        .orderBy(product.category.sort.asc(), product.sort.asc());
     }
 
+    /**
+     * 构建关联加载方法
+     * 根据传入的查询对象为JPAQuery添加关联查询
+     *
+     * @param query 查询条件对象，包含了需要加载的关联
+     * @param jpaQuery 已构建的基本查询对象
+     */
+    @Override
+    public void buildRelationship(ProductQuery query, JPAQuery<Product> jpaQuery) {
+        QProduct product = QProduct.product; // 查询产品的QueryDSL对象
+        QCategory category = QCategory.category; // 查询类别的QueryDSL对象
+        
+        // 默认加载类别
+        jpaQuery.leftJoin(product.category, category)
+                .fetchJoin();
+                
+        // 这里可以添加更多关联加载逻辑，如果有需要的话
+    }
 
     /**
      * 获取在售商品列表，包含库存信息

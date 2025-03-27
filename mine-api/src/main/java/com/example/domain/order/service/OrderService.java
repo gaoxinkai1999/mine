@@ -20,7 +20,6 @@ import com.example.query.OrderQuery;
 import com.example.query.ProductQuery;
 import com.example.query.ShopQuery;
 import com.querydsl.core.BooleanBuilder;
-import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,55 +59,20 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
 
 
     /**
-     * 构建基础查询对象
-     * 根据传入的查询参数，构建一个基础的JPAQuery对象
-     * 该方法主要处理了关联查询和条件查询，以提高查询效率和准确性
+     * 构建基本条件查询对象
+     * 根据传入的查询参数，构建一个基本的JPAQuery对象，只包含条件查询
      *
-     * @param query 订单查询参数，包含需要查询的条件和包含的关联实体
+     * @param query 订单查询参数，包含需要查询的条件
      * @return 返回一个根据查询参数配置好的JPAQuery对象
      */
     @Override
-    public JPAQuery<Order> buildBaseQuery(OrderQuery query) {
-
+    public JPAQuery<Order> buildConditionQuery(OrderQuery query) {
         QOrder qOrder = QOrder.order; // 查询订单的QueryDSL对象
-        QOrderDetail qOrderDetail = QOrderDetail.orderDetail; // 查询订单详情的QueryDSL对象
-        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
-        QShop qShop = QShop.shop; // 查询商店的QueryDSL对象
-        QPriceRule qPriceRule = QPriceRule.priceRule; // 查询价格规则的QueryDSL对象
 
         // 初始化查询对象
         JPAQuery<Order> jpaQuery = queryFactory
                 .selectFrom(qOrder)
                 .distinct();
-
-
-
-
-        // 处理关联
-        // 如果查询参数中包含店铺信息，则左连接店铺表，并根据条件进一步连接价格规则表
-        if (query.getIncludes()
-                 .contains(OrderQuery.Include.SHOP)) {
-            jpaQuery.leftJoin(qOrder.shop, qShop)
-                    .fetchJoin();
-            if (query.getIncludes()
-                     .contains(OrderQuery.Include.PRICE_RULE)) {
-                jpaQuery.leftJoin(qShop.priceRule, qPriceRule)
-                        .fetchJoin();
-            }
-        }
-
-        // 如果查询参数中包含订单详情，则左连接订单详情表，并根据条件进一步连接产品表
-        if (query.getIncludes()
-                 .contains(OrderQuery.Include.DETAILS)) {
-            jpaQuery.leftJoin(qOrder.orderDetails, qOrderDetail)
-                    .fetchJoin();
-
-            if (query.getIncludes()
-                     .contains(OrderQuery.Include.PRODUCT)) {
-                jpaQuery.leftJoin(qOrderDetail.product, qProduct)
-                        .fetchJoin();
-            }
-        }
 
         // 处理查询条件
         // 根据查询参数构建where条件，以精确查询
@@ -138,6 +102,47 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                        .orderBy(qOrder.createTime.desc());
     }
 
+    /**
+     * 构建关联加载
+     * 根据传入的查询参数，为查询对象加载关联实体
+     *
+     * @param query 订单查询参数，包含需要包含的关联实体
+     * @param jpaQuery 已构建的基本查询对象
+     */
+    @Override
+    public void buildRelationship(OrderQuery query, JPAQuery<Order> jpaQuery) {
+        QOrder qOrder = QOrder.order; // 查询订单的QueryDSL对象
+        QOrderDetail qOrderDetail = QOrderDetail.orderDetail; // 查询订单详情的QueryDSL对象
+        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
+        QShop qShop = QShop.shop; // 查询商店的QueryDSL对象
+        QPriceRule qPriceRule = QPriceRule.priceRule; // 查询价格规则的QueryDSL对象
+
+        // 处理关联
+        // 如果查询参数中包含店铺信息，则左连接店铺表，并根据条件进一步连接价格规则表
+        if (query.getIncludes()
+                 .contains(OrderQuery.Include.SHOP)) {
+            jpaQuery.leftJoin(qOrder.shop, qShop)
+                    .fetchJoin();
+            if (query.getIncludes()
+                     .contains(OrderQuery.Include.PRICE_RULE)) {
+                jpaQuery.leftJoin(qShop.priceRule, qPriceRule)
+                        .fetchJoin();
+            }
+        }
+
+        // 如果查询参数中包含订单详情，则左连接订单详情表，并根据条件进一步连接产品表
+        if (query.getIncludes()
+                 .contains(OrderQuery.Include.DETAILS)) {
+            jpaQuery.leftJoin(qOrder.orderDetails, qOrderDetail)
+                    .fetchJoin();
+
+            if (query.getIncludes()
+                     .contains(OrderQuery.Include.PRODUCT)) {
+                jpaQuery.leftJoin(qOrderDetail.product, qProduct)
+                        .fetchJoin();
+            }
+        }
+    }
 
     @Override
     public Slice<Order> findPage(OrderQuery query, Pageable pageable){
@@ -151,8 +156,6 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
         JPAQuery<Integer> jpaQuery = queryFactory
                 .select(qOrder.id)
                 .from(qOrder);
-
-        BooleanExpression eq = qShop.id.eq(qOrder.shop.id);
 
         // 处理查询条件
         // 根据查询参数构建where条件，以精确查询
@@ -190,34 +193,11 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
         JPAQuery<Order> jpaQueryEntity = queryFactory
                 .selectFrom(qOrder)
                 .where(qOrder.id.in(content)).orderBy(qOrder.createTime.desc());
-        // 处理关联
-        // 如果查询参数中包含店铺信息，则左连接店铺表，并根据条件进一步连接价格规则表
-
-        if (query.getIncludes()
-                 .contains(OrderQuery.Include.SHOP)) {
-            jpaQueryEntity.leftJoin(qOrder.shop, qShop)
-                    .fetchJoin();
-            if (query.getIncludes()
-                     .contains(OrderQuery.Include.PRICE_RULE)) {
-                jpaQueryEntity.leftJoin(qShop.priceRule, qPriceRule)
-                        .fetchJoin();
-            }
-        }
-
-        // 如果查询参数中包含订单详情，则左连接订单详情表，并根据条件进一步连接产品表
-        if (query.getIncludes()
-                 .contains(OrderQuery.Include.DETAILS)) {
-            jpaQueryEntity.leftJoin(qOrder.orderDetails, qOrderDetail)
-                    .fetchJoin();
-
-            if (query.getIncludes()
-                     .contains(OrderQuery.Include.PRODUCT)) {
-                jpaQueryEntity.leftJoin(qOrderDetail.product, qProduct)
-                        .fetchJoin();
-            }
-        }
+                
+        // 为结果加载关联对象
+        buildRelationship(query, jpaQueryEntity);
+        
         List<Order> orders = jpaQueryEntity.fetch();
-
 
         return new SliceImpl<>(orders, pageable, hasNext);
     }

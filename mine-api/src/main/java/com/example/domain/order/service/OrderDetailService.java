@@ -27,34 +27,19 @@ public class OrderDetailService implements BaseRepository<OrderDetail, OrderDeta
     private JPAQueryFactory queryFactory;
     
     /**
-     * 构建基础查询
-     * 根据查询条件构建QueryDSL查询对象
+     * 构建基本条件查询
+     * 根据查询条件构建基本的QueryDSL查询对象，只包含查询条件
      *
      * @param query 查询条件
-     * @return 构建好的查询对象
+     * @return 构建好的基本查询对象
      */
     @Override
-    public JPAQuery<OrderDetail> buildBaseQuery(OrderDetailQuery query) {
+    public JPAQuery<OrderDetail> buildConditionQuery(OrderDetailQuery query) {
         QOrderDetail orderDetail = QOrderDetail.orderDetail;
-        QProduct product = QProduct.product;
-        QShop shop = QShop.shop;
         
         // 创建基础查询
         JPAQuery<OrderDetail> jpaQuery = queryFactory.selectFrom(orderDetail)
                 .distinct();
-        
-        // 处理关联
-        if (query.getIncludes().contains(OrderDetailQuery.Include.PRODUCT)) {
-            jpaQuery.leftJoin(orderDetail.product, product).fetchJoin();
-        }
-        
-        if (query.getIncludes().contains(OrderDetailQuery.Include.ORDER)) {
-            jpaQuery.leftJoin(orderDetail.order).fetchJoin();
-        }
-        
-        if (query.getIncludes().contains(OrderDetailQuery.Include.SHOP)) {
-            jpaQuery.leftJoin(orderDetail.order.shop, shop).fetchJoin();
-        }
         
         // 构建查询条件
         BooleanBuilder where = new BooleanBuilder();
@@ -85,5 +70,32 @@ public class OrderDetailService implements BaseRepository<OrderDetail, OrderDeta
         // 应用查询条件并按订单创建时间降序排序
         return jpaQuery.where(where)
                 .orderBy(orderDetail.order.createTime.desc());
+    }
+    
+    /**
+     * 构建关联加载
+     * 根据查询条件加载关联对象
+     *
+     * @param query 查询条件
+     * @param jpaQuery 已构建的基本查询对象
+     */
+    @Override
+    public void buildRelationship(OrderDetailQuery query, JPAQuery<OrderDetail> jpaQuery) {
+        QOrderDetail orderDetail = QOrderDetail.orderDetail;
+        QProduct product = QProduct.product;
+        QShop shop = QShop.shop;
+        
+        // 处理关联
+        if (query.getIncludes().contains(OrderDetailQuery.Include.PRODUCT)) {
+            jpaQuery.leftJoin(orderDetail.product, product).fetchJoin();
+        }
+        
+        if (query.getIncludes().contains(OrderDetailQuery.Include.ORDER)) {
+            jpaQuery.leftJoin(orderDetail.order).fetchJoin();
+        }
+        
+        if (query.getIncludes().contains(OrderDetailQuery.Include.SHOP)) {
+            jpaQuery.leftJoin(orderDetail.order.shop, shop).fetchJoin();
+        }
     }
 } 

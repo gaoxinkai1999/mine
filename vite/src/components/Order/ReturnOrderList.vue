@@ -77,10 +77,12 @@
 </template>
 
 <script>
-import api from "@/api";
-import { showFailToast, showSuccessToast, showConfirmDialog } from "vant";
 import { Clipboard } from '@capacitor/clipboard';
-import { formatReturnReceipt, printReturnOrder } from "@/utils/printService";
+import api from "@/api";
+import {formatReturnReceipt, printReturnOrder} from "@/utils/printService";
+import {showFailToast, showSuccessToast, showConfirmDialog} from "vant";
+import { useOrderListStore } from "@/stores/orderList";
+import { watch } from 'vue';
 
 export default {
   name: 'ReturnOrderList',
@@ -88,9 +90,24 @@ export default {
     selectionMode: {
       type: Boolean,
       default: false
+    },
+    customMode: {
+      type: Boolean,
+      default: false
+    },
+    shopId: {
+      type: [String, Number],
+      default: null
     }
   },
   emits: ['order-selected'],
+  setup() {
+    const orderListStore = useOrderListStore();
+    
+    return {
+      orderListStore
+    };
+  },
   data() {
     return {
       orders: [],
@@ -101,7 +118,7 @@ export default {
       showActionSheet: false,
       selectedOrder: null,
       actions: [
-        { name: '单个操作', subname: '针对当前选中退货单的操作', disabled: true },
+        { name: '单个操作', subname: '针对当前选中订单的操作', disabled: true },
         { 
           name: '打印退货单', 
           color: '#07c160',
@@ -118,8 +135,7 @@ export default {
           callback: () => this.handleDeleteOrder(this.selectedOrder.id)
         }
       ],
-      selectedOrders: [], // 多选模式下选中的订单
-      // 筛选条件
+      selectedOrders: [],
       filterParams: {
         shopId: null,
         startDate: null,
@@ -128,10 +144,43 @@ export default {
     }
   },
   mounted() {
-    // 从路由中获取筛选参数
-    this.filterParams.shopId = this.$route.query.shopId || null;
-    this.filterParams.startDate = this.$route.query.startDate || null;
-    this.filterParams.endDate = this.$route.query.endDate || null;
+    // 监听store中的选择模式变化
+    watch(() => this.orderListStore.isSelectionMode, (newValue) => {
+      if (!newValue) {
+        // 如果选择模式被关闭，清除本地选择状态
+        this.clearSelection();
+      }
+    });
+    
+    if (this.shopId) {
+      this.filterParams.shopId = this.shopId;
+    } else if (!this.customMode) {
+      // 从store获取筛选参数
+      this.filterParams.shopId = this.orderListStore.filterParams.shopId || null;
+      this.filterParams.startDate = this.orderListStore.filterParams.startDate || null;
+      this.filterParams.endDate = this.orderListStore.filterParams.endDate || null;
+    }
+  },
+  watch: {
+    shopId: {
+      handler(newVal) {
+        if (newVal) {
+          this.filterParams.shopId = newVal;
+          this.resetAndLoad();
+        }
+      }
+    },
+    'orderListStore.filterParams': {
+      handler(newVal) {
+        if (!this.customMode) {
+          this.filterParams.shopId = newVal.shopId || null;
+          this.filterParams.startDate = newVal.startDate || null;
+          this.filterParams.endDate = newVal.endDate || null;
+          this.resetAndLoad();
+        }
+      },
+      deep: true
+    }
   },
   methods: {
     formatTime(timestamp) {
@@ -149,7 +198,7 @@ export default {
     async handlePrintOrder() {
       try {
         await printReturnOrder(this.selectedOrder, (status) => {
-          console.log(status); // 或者更新UI显示状态
+          console.log(status);
         });
       } catch (error) {
         console.error('打印失败', error);
@@ -170,22 +219,17 @@ export default {
     handleDeleteOrder(id) {
       showConfirmDialog({
         title: '确认删除',
-        message: '确定要删除这笔退货订单吗？'
+        message: '确定要删除这个退货单吗？'
       }).then(() => {
-        api.returnorder.deleteReturnOrder(id).then(() => {
+        api.returnorder.deleteReturnOrder({orderId: id}).then(() => {
+          showSuccessToast('删除成功')
           this.orders = this.orders.filter(item => item.id !== id);
-          showSuccessToast('删除成功');
-        }).catch(err => {
-          showFailToast('删除失败: ' + err.message);
-        });
-      }).catch(() => {
-        // 取消删除
-      });
+        })
+      })
     },
     async onLoad() {
       this.loading = true;
       try {
-        // 使用分页API
         const response = await api.returnorder.getReturnOrders({
           shopId: this.filterParams.shopId,
           startDate: this.filterParams.startDate,
@@ -199,23 +243,25 @@ export default {
           this.pageIndex += 1;
           this.finished = !response.hasNext;
         } else {
-          console.error('获取退货订单数据格式错误:', response);
+          console.error('获取退货单数据格式错误:', response);
           this.finished = true;
         }
       } catch (error) {
-        console.error('获取退货订单失败', error);
-        showFailToast('获取退货订单失败');
+        console.error('获取退货单失败', error);
+        showFailToast('获取退货单失败');
       } finally {
         this.loading = false;
       }
     },
-    
-    // 判断订单是否被选中
+    resetAndLoad() {
+      this.orders = [];
+      this.pageIndex = 0;
+      this.finished = false;
+      this.onLoad();
+    },
     isOrderSelected(order) {
       return this.selectedOrders.some(item => item.id === order.id);
     },
-    
-    // 切换订单选中状态
     toggleOrderSelection(order, selected) {
       if (selected) {
         this.selectedOrders.push(order);
@@ -223,11 +269,8 @@ export default {
         this.selectedOrders = this.selectedOrders.filter(item => item.id !== order.id);
       }
       
-      // 触发事件通知父组件
       this.$emit('order-selected', order, selected);
     },
-    
-    // 清除选择状态
     clearSelection() {
       this.selectedOrders = [];
     }

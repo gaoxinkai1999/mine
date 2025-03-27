@@ -52,32 +52,18 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
 
 
     /**
-     * 构建基础查询
+     * 构建基本条件查询
      *
      * @param query 查询条件
      * @return JPA查询对象
      */
     @Override
-    public JPAQuery<Inventory> buildBaseQuery(InventoryQuery query) {
+    public JPAQuery<Inventory> buildConditionQuery(InventoryQuery query) {
         QInventory qInventory = QInventory.inventory; // 查询库存的QueryDSL对象
-        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
-        QBatch qBatch = QBatch.batch; // 查询批次的QueryDSL对象
-        QCategory qCategory=QCategory.category;
+        
         // 初始化查询对象
         JPAQuery<Inventory> jpaQuery = queryFactory.selectFrom(qInventory)
                                                    .distinct();
-
-        // 处理关联
-        if (query.getIncludes()
-                 .contains(InventoryQuery.Include.PRODUCT)) {
-            jpaQuery.leftJoin(qInventory.product, qProduct)
-                    .fetchJoin();
-        }
-        if (query.getIncludes()
-                 .contains(InventoryQuery.Include.BATCH)) {
-            jpaQuery.leftJoin(qInventory.batch, qBatch)
-                    .fetchJoin();
-        }
 
         // 处理查询条件
         BooleanBuilder where = new BooleanBuilder();
@@ -96,7 +82,30 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
         return jpaQuery.where(where);
     }
 
-
+    /**
+     * 构建关联加载
+     *
+     * @param query 查询条件
+     * @param jpaQuery 已构建的基本查询
+     */
+    @Override
+    public void buildRelationship(InventoryQuery query, JPAQuery<Inventory> jpaQuery) {
+        QInventory qInventory = QInventory.inventory; // 查询库存的QueryDSL对象
+        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
+        QBatch qBatch = QBatch.batch; // 查询批次的QueryDSL对象
+        
+        // 处理关联
+        if (query.getIncludes()
+                 .contains(InventoryQuery.Include.PRODUCT)) {
+            jpaQuery.leftJoin(qInventory.product, qProduct)
+                    .fetchJoin();
+        }
+        if (query.getIncludes()
+                 .contains(InventoryQuery.Include.BATCH)) {
+            jpaQuery.leftJoin(qInventory.batch, qBatch)
+                    .fetchJoin();
+        }
+    }
 
     @Transactional
     public void update(InventoryUpdateDto inventoryUpdateDto) {

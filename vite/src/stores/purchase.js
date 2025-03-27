@@ -103,7 +103,7 @@ export const usePurchaseStore = defineStore('purchase', () => {
                 }))
             }
 
-            await api.purchase.createPurchase(request)
+            await api.purchase.createPurchaseOrder(request)
             showSuccessToast('提交成功')
             clearPurchaseList()
             return true

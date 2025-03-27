@@ -43,15 +43,14 @@ public class PriceRuleService implements BaseRepository<PriceRule, PriceRuleQuer
     private final QPriceRuleDetail priceRuleDetail = QPriceRuleDetail.priceRuleDetail; // 查询价格规则详情的QueryDSL对象
 
     /**
-     * 重写构建基础查询方法
-     * 根据传入的查询对象构建一个基础的JPA查询对象
-     * 此方法专注于构造查询的基础部分，包括选择字段、基础条件和关联查询
+     * 构建基本条件查询方法
+     * 根据传入的查询对象构建一个只包含条件的JPA查询对象
      *
      * @param query 价格规则查询对象，包含了一系列的查询条件和参数
-     * @return 返回一个经过基础条件和关联查询设置的JPAQuery对象
+     * @return 返回一个经过基础条件设置的JPAQuery对象
      */
     @Override
-    public JPAQuery<PriceRule> buildBaseQuery(PriceRuleQuery query) {
+    public JPAQuery<PriceRule> buildConditionQuery(PriceRuleQuery query) {
         // 创建一个选择所有字段并去重的查询对象
         JPAQuery<PriceRule> jpaQuery = queryFactory
                 .selectFrom(priceRule)
@@ -65,19 +64,6 @@ public class PriceRuleService implements BaseRepository<PriceRule, PriceRuleQuer
             where.and(priceRule.id.eq(query.getId()));
         }
 
-        // 处理关联
-        // 如果查询对象的Includes包含DETAILS，则进行关联查询
-        // 这里解释了为什么需要进行关联查询：为了获取未删除的产品信息
-        if (query.getIncludes()
-                 .contains(PriceRuleQuery.Include.DETAILS)) {
-            jpaQuery.leftJoin(priceRule.priceRuleDetails, priceRuleDetail)
-                    .fetchJoin();
-            jpaQuery.leftJoin(priceRuleDetail.product, product)
-                    .fetchJoin();
-            // 添加产品未删除的条件
-            where.and(product.isDel.eq(false));
-        }
-
         // 如果查询对象的IsDel不为空，则添加软删除的查询条件
         if (query.getIsDel() != null) {
             where.and(priceRule.isDie.eq(query.getIsDel()));
@@ -87,11 +73,36 @@ public class PriceRuleService implements BaseRepository<PriceRule, PriceRuleQuer
         return jpaQuery
                 .where(where);
     }
-        /**
-         * 获取简易价格规则列表
-         *
-         * @return
-         */
+
+    /**
+     * 构建关联加载方法
+     * 根据传入的查询对象为JPAQuery添加关联查询
+     *
+     * @param query 价格规则查询对象，包含了需要关联的实体
+     * @param jpaQuery 已构建的基本查询对象
+     */
+    @Override
+    public void buildRelationship(PriceRuleQuery query, JPAQuery<PriceRule> jpaQuery) {
+        // 处理关联
+        // 如果查询对象的Includes包含DETAILS，则进行关联查询
+        if (query.getIncludes()
+                 .contains(PriceRuleQuery.Include.DETAILS)) {
+            jpaQuery.leftJoin(priceRule.priceRuleDetails, priceRuleDetail)
+                    .fetchJoin();
+            jpaQuery.leftJoin(priceRuleDetail.product, product)
+                    .fetchJoin();
+            // 添加产品未删除的条件
+            BooleanBuilder where = new BooleanBuilder();
+            where.and(product.isDel.eq(false));
+            jpaQuery.where(where);
+        }
+    }
+
+    /**
+     * 获取简易价格规则列表
+     *
+     * @return
+     */
     public List<PriceRuleSimpleDto> getSimplePriceRules() {
         List<PriceRule> priceRules = this.findList(PriceRuleQuery.builder().isDel(false).build());
         return priceRules.stream()

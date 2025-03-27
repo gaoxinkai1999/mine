@@ -128,8 +128,8 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showToast, showDialog } from 'vant';
-import { usePurchaseStore } from '@/stores/purchase';
-import ProductList from '@/components/ProductList.vue';
+import { usePurchaseStore } from '@/stores/purchase.js';
+import ProductList from '@/pages/purchase/ProductList.vue';
 
 // 路由与状态
 const router = useRouter();
@@ -161,22 +161,7 @@ const currentProducts = computed(() => {
     result = result.filter(product => product.categoryId === category.id);
   }
   
-  // 排序
-  switch (sortType.value) {
-    case 'price-desc':
-      result.sort((a, b) => b.price - a.price);
-      break;
-    case 'price-asc':
-      result.sort((a, b) => a.price - b.price);
-      break;
-    case 'stock-desc':
-      result.sort((a, b) => b.stock - a.stock);
-      break;
-    default:
-      // 默认排序保持原顺序
-      break;
-  }
-  
+
   return result;
 });
 
@@ -209,10 +194,6 @@ function handleBack() {
 
 
 
-function applyFilter() {
-  showFilterPanel.value = false;
-}
-
 function handleProductSelected(product) {
   const existing = purchaseList.value.find(item => item.productId === product.id);
   
@@ -226,7 +207,7 @@ function handleProductSelected(product) {
       productId: product.id,
       productName: product.name,
       quantity: 1,
-      totalAmount: product.costPrice
+      totalAmount: product.purchasePrice
     });
     
     showToast({
@@ -258,7 +239,7 @@ function handleStepperChange(item) {
         store.updatePurchaseList({
           ...item,
           quantity: 1,
-          totalAmount: product.costPrice
+          totalAmount: product.purchasePrice
         });
       }
     });
@@ -266,7 +247,7 @@ function handleStepperChange(item) {
     store.updatePurchaseList({
       ...item,
       quantity: item.quantity,
-      totalAmount: item.quantity * product.costPrice
+      totalAmount: item.quantity * product.purchasePrice
     });
   }
 }

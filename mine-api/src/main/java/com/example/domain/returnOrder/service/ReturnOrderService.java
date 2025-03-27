@@ -64,30 +64,20 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
     private JPAQueryFactory queryFactory;
 
     /**
-     * 构建基础查询
-     * 根据传入的查询参数，构建一个基础的JPAQuery对象
+     * 构建基本条件查询
+     * 根据传入的查询参数，构建一个基本的JPAQuery对象，只包含条件查询
      *
      * @param query 查询参数
      * @return 查询对象
      */
     @Override
-    public JPAQuery<ReturnOrder> buildBaseQuery(ReturnOrderQuery query) {
+    public JPAQuery<ReturnOrder> buildConditionQuery(ReturnOrderQuery query) {
         QReturnOrder qReturnOrder = QReturnOrder.returnOrder;
         QReturnOrderDetail qReturnOrderDetail = QReturnOrderDetail.returnOrderDetail;
-        QShop qShop = QShop.shop;
 
         // 初始化查询对象
         JPAQuery<ReturnOrder> jpaQuery = queryFactory.selectFrom(qReturnOrder)
                 .distinct();
-
-        // 处理关联查询
-        if (query.getIncludes().contains(ReturnOrderQuery.Include.SHOP)) {
-            jpaQuery.leftJoin(qReturnOrder.shop, qShop).fetchJoin();
-        }
-
-        if (query.getIncludes().contains(ReturnOrderQuery.Include.DETAILS)) {
-            jpaQuery.leftJoin(qReturnOrder.returnOrderDetails, qReturnOrderDetail).fetchJoin();
-        }
 
         // 处理查询条件
         BooleanBuilder where = new BooleanBuilder();
@@ -112,6 +102,29 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
         }
 
         return jpaQuery.where(where).orderBy(qReturnOrder.createTime.desc());
+    }
+
+    /**
+     * 构建关联加载
+     * 根据查询条件加载关联对象
+     *
+     * @param query 查询条件
+     * @param jpaQuery 已构建的基本查询对象
+     */
+    @Override
+    public void buildRelationship(ReturnOrderQuery query, JPAQuery<ReturnOrder> jpaQuery) {
+        QReturnOrder qReturnOrder = QReturnOrder.returnOrder;
+        QReturnOrderDetail qReturnOrderDetail = QReturnOrderDetail.returnOrderDetail;
+        QShop qShop = QShop.shop;
+
+        // 处理关联查询
+        if (query.getIncludes().contains(ReturnOrderQuery.Include.SHOP)) {
+            jpaQuery.leftJoin(qReturnOrder.shop, qShop).fetchJoin();
+        }
+
+        if (query.getIncludes().contains(ReturnOrderQuery.Include.DETAILS)) {
+            jpaQuery.leftJoin(qReturnOrder.returnOrderDetails, qReturnOrderDetail).fetchJoin();
+        }
     }
 
     /**

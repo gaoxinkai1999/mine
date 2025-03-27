@@ -1,32 +1,39 @@
 package com.example.domain.purchase.service;
 
-import com.example.domain.batch.entity.Batch;
 import com.example.domain.batch.service.BatchService;
 import com.example.domain.forecast.service.ForecastService;
 import com.example.domain.inventory.service.InventoryService;
 import com.example.domain.product.dto.ProductDto;
 import com.example.domain.product.entity.Product;
+import com.example.domain.product.entity.QProduct;
 import com.example.domain.product.service.ProductService;
 import com.example.domain.purchase.dto.ProductWithPurchaseInfoDto;
 import com.example.domain.purchase.dto.PurchaseCreateRequest;
-import com.example.domain.purchase.entity.Purchase;
-import com.example.domain.purchase.entity.PurchaseDetail;
-import com.example.domain.purchase.entity.PurchaseState;
+import com.example.domain.purchase.dto.PurchaseDto;
+import com.example.domain.purchase.entity.*;
+import com.example.domain.purchase.mapper.PurchaseMapper;
 import com.example.domain.purchase.repository.PurchaseRepository;
 import com.example.domain.statistics.dto.response.SalesStatisticsDTO;
 import com.example.domain.statistics.service.StatisticsService;
 import com.example.exception.MyException;
+import com.example.interfaces.BaseRepository;
 import com.example.query.ProductQuery;
+import com.example.query.PurchaseQuery;
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.jpa.impl.JPAQuery;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 采购管理服务
@@ -34,7 +41,7 @@ import java.util.Map;
  */
 @Service
 @Slf4j
-public class PurchaseService {
+public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> {
 
     @Autowired
     private InventoryService inventoryService; // 库存服务，用于管理库存
@@ -50,9 +57,173 @@ public class PurchaseService {
 
     @Autowired
     private BatchService batchService; // 批次服务
+
     @Autowired
     private ForecastService forecastService; // 预测服务
 
+    @Autowired
+    private JPAQueryFactory queryFactory; // JPA查询工厂
+
+    @Autowired
+    private PurchaseMapper purchaseMapper; // 采购映射器，用于对象转换
+
+    /**
+     * 根据查询条件构建基本条件查询
+     *
+     * @param query 查询条件
+     * @return 构建好的基本查询对象
+     */
+    @Override
+    public JPAQuery<Purchase> buildConditionQuery(PurchaseQuery query) {
+        QPurchase qPurchase = QPurchase.purchase;
+        QPurchaseDetail qPurchaseDetail = QPurchaseDetail.purchaseDetail;
+
+        // 创建一个选择所有字段的查询，并确保结果唯一
+        JPAQuery<Purchase> jpaQuery = queryFactory.selectFrom(qPurchase)
+                                                  .distinct();
+
+        // 构建查询条件
+        BooleanBuilder where = new BooleanBuilder();
+        if (query.getIds() != null) {
+            where.and(qPurchase.id.in(query.getIds()));
+        }
+
+        if (query.getId() != null) {
+            where.and(qPurchase.id.eq(query.getId()));
+        }
+
+        if (query.getState() != null) {
+            where.and(qPurchase.state.stringValue()
+                                     .eq(query.getState()));
+        }
+
+        if (query.getCreateTimeStart() != null) {
+            where.and(qPurchase.createTime.goe(query.getCreateTimeStart()));
+        }
+
+        if (query.getCreateTimeEnd() != null) {
+            where.and(qPurchase.createTime.loe(query.getCreateTimeEnd()));
+        }
+
+        return jpaQuery.where(where)
+                       .orderBy(qPurchase.createTime.desc());
+    }
+
+    @Override
+    public Slice<Purchase> findPage(PurchaseQuery query, Pageable pageable) {
+        // 使用构建的条件查询
+        JPAQuery<Purchase> purchaseJPAQuery = buildConditionQuery(query);
+        
+        // 获取分页结果
+        List<Purchase> fetch = purchaseJPAQuery
+                                .offset(pageable.getOffset())
+                                .limit(pageable.getPageSize() + 1)
+                                .fetch();
+
+        // 判断是否有下一页
+        boolean hasNext = fetch.size() > pageable.getPageSize();
+        if (hasNext) {
+            fetch.removeLast();
+        }
+
+
+        // 获取ID列表
+        List<Integer> ids = fetch.stream()
+                             .map(Purchase::getId)
+                             .collect(Collectors.toList());
+
+        // 重新查询完整数据并加载关联实体
+        PurchaseQuery enrichQuery = PurchaseQuery.builder()
+                                              .ids(ids.toArray(new Integer[0]))
+                                              .includes(query.getIncludes())
+                                              .build();
+                                              
+        List<Purchase> purchases = findList(enrichQuery);
+        
+        // 保持原始排序
+        Map<Integer, Purchase> purchaseMap = purchases.stream()
+                                                     .collect(Collectors.toMap(
+                                                         Purchase::getId, 
+                                                         p -> p
+                                                     ));
+        List<Purchase> sortedPurchases = ids.stream()
+                                          .map(purchaseMap::get)
+                                          .filter(Objects::nonNull)
+                                          .collect(Collectors.toList());
+        
+        return new SliceImpl<>(sortedPurchases, pageable, hasNext);
+    }
+
+    /**
+     * 根据查询条件构建关联加载
+     *
+     * @param query    查询条件
+     * @param jpaQuery 已构建的基本查询对象
+     */
+    @Override
+    public void buildRelationship(PurchaseQuery query, JPAQuery<Purchase> jpaQuery) {
+        QPurchase qPurchase = QPurchase.purchase;
+        QPurchaseDetail qPurchaseDetail = QPurchaseDetail.purchaseDetail;
+        QProduct qProduct = QProduct.product;
+
+        // 处理关联
+        if (query.getIncludes() != null && query.getIncludes()
+                                                .contains(PurchaseQuery.Include.PURCHASE_DETAILS)) {
+            jpaQuery.leftJoin(qPurchase.purchaseDetails, qPurchaseDetail)
+                    .fetchJoin();
+
+            if (query.getIncludes()
+                     .contains(PurchaseQuery.Include.PRODUCT)) {
+                jpaQuery.leftJoin(qPurchaseDetail.product, qProduct)
+                        .fetchJoin();
+            }
+        }
+    }
+
+    /**
+     * 获取采购订单列表
+     *
+     * @param query 查询条件
+     * @return 采购订单实体列表
+     */
+    public List<Purchase> getPurchaseList(PurchaseQuery query) {
+        return findList(query);
+    }
+
+    /**
+     * 获取采购订单DTO列表
+     *
+     * @param query 查询条件
+     * @return 采购订单DTO列表
+     */
+    public List<PurchaseDto> getPurchaseDtoList(PurchaseQuery query) {
+        List<Purchase> purchases = findList(query);
+        return purchaseMapper.toPurchaseDTOList(purchases);
+    }
+
+    /**
+     * 根据ID获取采购订单
+     *
+     * @param id 采购订单ID
+     * @return 采购订单
+     */
+    public Optional<Purchase> getPurchaseById(Integer id) {
+        return findOne(PurchaseQuery.builder()
+                                    .id(id)
+                                    .includes(Set.of(PurchaseQuery.Include.PURCHASE_DETAILS, PurchaseQuery.Include.PRODUCT))
+                                    .build());
+    }
+
+    /**
+     * 根据ID获取采购订单DTO
+     *
+     * @param id 采购订单ID
+     * @return 采购订单DTO
+     */
+    public Optional<PurchaseDto> getPurchaseDtoById(Integer id) {
+        return getPurchaseById(id)
+                .map(purchaseMapper::toPurchaseDTO);
+    }
 
     /**
      * 创建采购订单并入库
@@ -63,6 +234,8 @@ public class PurchaseService {
     public void createPurchaseOrder(PurchaseCreateRequest request) {
         // 1. 创建采购订单
         Purchase purchase = new Purchase();
+        purchase.setState(PurchaseState.已下单);
+        purchase.setPurchaseDetails(new ArrayList<>());
 
         // 2. 处理每个商品的采购明细
         for (PurchaseCreateRequest.PurchaseDetailRequest detailRequest : request.getDetails()) {
@@ -81,29 +254,11 @@ public class PurchaseService {
             detail.setTotalAmount(detailRequest.getTotalAmount());
             purchase.getPurchaseDetails()
                     .add(detail);
-
-            // 处理入库
-            if (product.isBatchManaged()) {
-                // 对于需要批次管理的商品，创建批次并入库
-                if (detailRequest.getProductionDate() == null || detailRequest.getExpirationDate() == null) {
-                    throw new MyException("批次商品必须提供生产日期和有效期：" + product.getName());
-                }
-
-                // 创建批次
-                Batch batch = batchService.createBatch(
-                        product,
-                        detail,
-                        detailRequest.getProductionDate(),
-                        detailRequest.getExpirationDate()
-                );
-
-                // 批次入库
-                inventoryService.stockIn(product, batch, detailRequest.getQuantity());
-            } else {
-                // 对于不需要批次管理的商品，直接入库
-                inventoryService.stockIn(product, detailRequest.getQuantity());
-            }
         }
+        purchase.setTotalAmount(purchase.getPurchaseDetails()
+                                        .stream()
+                                        .map(PurchaseDetail::getTotalAmount)
+                                        .reduce(BigDecimal.ZERO, BigDecimal::add));
 
         // 3. 保存采购订单
         purchaseRepository.save(purchase);
@@ -150,7 +305,6 @@ public class PurchaseService {
      *
      * @return
      */
-
     public List<ProductWithPurchaseInfoDto> getOnSaleProductsWithPurchaseInfo() {
         // 在售商品的详细信息，包含库存
         List<ProductDto> products = productService.getProducts();
@@ -198,36 +352,66 @@ public class PurchaseService {
         return list;
     }
 
-    // 商品预警库存和预计销量
+    /**
+     * 计算指定商品列表的预计销量和预警库存。
+     *
+     * @param productIds 商品ID数组。
+     * @return Map，键为商品ID，值为包含 "forecastQuantity" (预计销量) 和 "warningQuantity" (预警库存) 的 Map。
+     * 如果某个商品预测失败，其对应的值可能为 null 或包含错误信息（取决于具体实现）。
+     */
     public Map<Integer, Map<String, Integer>> calculatePurchaseQuantity(int[] productIds) {
         Map<Integer, Map<String, Integer>> productIdQuantityMap = new HashMap<>();
-        Map<LocalDate, SalesStatisticsDTO> data = statisticsService.calculateDailyStatistics(LocalDate.now()
-                                                                                                      .minusDays(180), LocalDate.now()
-                                                                                                                                .minusDays(1));
+        int forecastHorizonDays = 30; // 预测未来多少天
+        int warningStockDays = 5;    // 预警库存覆盖的天数
+
+        // 1. 获取足够长的历史销售数据 (例如过去 1 年 + 预测期，以便季节性模型有足够数据)
+        //    注意：具体需要多长的数据取决于最复杂模型的需求 (HoltWintersSeasonal 需要至少 1 年)
+        //    这里获取稍长一些的数据以备优化和初始化使用
+        LocalDate endDate = LocalDate.now()
+                                     .minusDays(1);
+        LocalDate startDate = endDate.minusDays(120); // 获取约1年多的数据
+        log.info("开始计算采购数量，获取历史数据范围: {} 到 {}", startDate, endDate);
+        Map<LocalDate, SalesStatisticsDTO> historicalDataMap = statisticsService.calculateDailyStatistics(startDate, endDate);
+        log.info("获取到 {} 天的历史销售统计数据。", historicalDataMap.size());
+
+
+        // 2. 遍历每个商品进行预测
         Arrays.stream(productIds)
+              // 可以考虑并行处理以提高效率
               .forEach(productId -> {
-                  double[] productData = forecastService.getProductData(data, productId);
-                  log.info("商品{}销量数据：{}", productId, productData.length);
-                  double[] doubles = forecastService.aggregateToWeeklyData(productData);
-                  log.info("商品{}销量数据：{}", productId, doubles.length);
-                  // 预计销量
-                  double forecastData = 0;
+                  double totalForecastQuantity = 0;
                   try {
-                      log.info("商品{}预计销量计算中...", productId);
-                      forecastData = forecastService.forecast(doubles, 4);
+                      log.info("商品ID: {} 开始预测未来 {} 天销量...", productId, forecastHorizonDays);
+                      // 调用重构后的 ForecastService 方法
+                      totalForecastQuantity = forecastService.forecastProductTotal(productId, historicalDataMap, forecastHorizonDays);
+                      log.info("商品ID: {} 预测未来 {} 天总销量: {}", productId, forecastHorizonDays, totalForecastQuantity);
+
+                      // 计算预警库存 (基于预测的日均销量)
+                      double averageDailyForecast = (forecastHorizonDays > 0) ? totalForecastQuantity / forecastHorizonDays : 0;
+                      double warningStock = averageDailyForecast * warningStockDays;
+
+                      // 存储结果 (确保为整数)
+                      productIdQuantityMap.put(productId, Map.of(
+                              "forecastQuantity", (int) Math.round(totalForecastQuantity),
+                              "warningQuantity", (int) Math.round(warningStock)
+                      ));
+
                   } catch (MyException e) {
-                      log.error("商品{}预计销量计算失败", productId);
+                      // 记录预测失败的商品
+                      log.error("商品ID: {} 预测销量计算失败: {}", productId, e.getMessage());
+                      // 可以选择放入 null 或特定的错误标记
                       productIdQuantityMap.put(productId, null);
-                      return;
+                  } catch (Exception e) {
+                      // 捕获其他意外异常
+                      log.error("商品ID: {} 预测过程中发生意外错误: {}", productId, e.getMessage(), e);
+                      productIdQuantityMap.put(productId, null);
                   }
-
-                  // 预警库存
-                  double warningStock = (forecastData / 28) * 5;
-
-                  productIdQuantityMap.put(productId, Map.of("forecastQuantity", (int) forecastData, "warningQuantity", (int) warningStock));
               });
+
+        log.info("采购数量计算完成，成功预测 {} 个商品。", productIdQuantityMap.values()
+                                                                             .stream()
+                                                                             .filter(v -> v != null)
+                                                                             .count());
         return productIdQuantityMap;
     }
-
-
 }

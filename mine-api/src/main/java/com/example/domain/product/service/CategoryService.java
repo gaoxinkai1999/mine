@@ -62,15 +62,12 @@ public class CategoryService implements BaseRepository<Category, CategoryQuery> 
     }
 
     @Override
-    public JPAQuery<Category> buildBaseQuery(CategoryQuery query) {
+    public JPAQuery<Category> buildConditionQuery(CategoryQuery query) {
         QCategory qCategory = QCategory.category; // 查询类别的QueryDSL对象
-
 
         // 初始化查询对象
         JPAQuery<Category> jpaQuery = queryFactory.selectFrom(qCategory)
                                                  .distinct();
-
-
 
         // 处理查询条件
         BooleanBuilder where = new BooleanBuilder();
@@ -93,6 +90,11 @@ public class CategoryService implements BaseRepository<Category, CategoryQuery> 
         // 返回查询对象，按照排序字段排序
         return jpaQuery.where(where)
                        .orderBy(qCategory.sort.asc());
+    }
+    
+    @Override
+    public void buildRelationship(CategoryQuery query, JPAQuery<Category> jpaQuery) {
+        // CategoryService没有需要处理的关联关系
     }
 
     /**

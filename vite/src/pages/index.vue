@@ -55,7 +55,8 @@ export default {
     
     // 功能菜单项
     const menuItems = ref([
-      { text: '采购管理', icon: 'cart-o', to: '/purchase' },
+      { text: '采购管理', icon: 'cart-o', to: '/purchase/create' },
+      { text: '采购历史', icon: 'cart-o', to: '/purchase/list' },
       { text: '库存管理', icon: 'label-o', to: '/product/inventory' },
       { text: '订单管理', icon: 'orders-o', to: '/order/list' },
       { text: '新建商家', icon: 'user-o', to: '/shop/create' },

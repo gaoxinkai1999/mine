@@ -14,9 +14,9 @@
           <!--          <van-tag type="success">库存充足</van-tag>-->
         </div>
         <div class="product-name">{{ product.name }}
-          <van-tag v-if="product.warningQuantity>=product.currentStock" type="danger">已紧急断货</van-tag>
+          <van-tag v-if="product.warningQuantity>=product.currentStock" type="danger">已断货</van-tag>
         </div>
-        <div class="product-price">¥{{ formatAmount(product.costPrice) }}</div>
+        <div class="product-price">¥{{ formatAmount(product.purchasePrice) }}</div>
         <div class="product-spec">当前库存: {{ product.currentStock }}</div>
         <div v-if="product.isForecastNormal===true" class="product-spec warning">预警库存: {{
             product.warningQuantity

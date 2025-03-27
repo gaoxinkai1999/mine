@@ -60,13 +60,29 @@ public interface BaseRepository<T, Q extends BaseQuery> {
 
     /**
      * 构建基础查询
+     * 该方法首先使用buildConditionQuery构建基本条件查询，然后使用buildRelationship加载关联对象
      * @param query 查询条件
      * @return JPAQuery对象
      */
-    JPAQuery<T> buildBaseQuery(Q query);
-
-
-
-
-
+    default JPAQuery<T> buildBaseQuery(Q query) {
+        JPAQuery<T> jpaQuery = buildConditionQuery(query);
+        buildRelationship(query, jpaQuery);
+        return jpaQuery;
+    }
+    
+    /**
+     * 构建基本条件查询
+     * 该方法只构建基本的查询条件，不加载关联对象
+     * @param query 查询条件
+     * @return JPAQuery对象
+     */
+    JPAQuery<T> buildConditionQuery(Q query);
+    
+    /**
+     * 加载关联对象
+     * 该方法根据查询条件加载关联对象
+     * @param query 查询条件
+     * @param jpaQuery 已构建的基本查询
+     */
+    void buildRelationship(Q query, JPAQuery<T> jpaQuery);
 }

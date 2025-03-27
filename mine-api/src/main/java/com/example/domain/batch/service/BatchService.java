@@ -45,18 +45,13 @@ public class BatchService implements BaseRepository<Batch, BatchQuery> {
 
 
     @Override
-    public JPAQuery<Batch> buildBaseQuery(BatchQuery query) {
+    public JPAQuery<Batch> buildConditionQuery(BatchQuery query) {
         QBatch qBatch = QBatch.batch; // 查询批次的QueryDSL对象
-        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
+        
         // 初始化查询对象
         JPAQuery<Batch> jpaQuery = queryFactory
                 .selectFrom(qBatch)
                 .distinct();
-
-        // 处理关联
-        if (query.getIncludes() != null && query.getIncludes().contains(BatchQuery.Include.PRODUCT)) {
-            jpaQuery.leftJoin(qBatch.product, qProduct).fetchJoin();
-        }
 
         // 处理查询条件
         BooleanBuilder where = new BooleanBuilder();
@@ -86,6 +81,17 @@ public class BatchService implements BaseRepository<Batch, BatchQuery> {
         }
 
         return jpaQuery.where(where).orderBy(qBatch.createdTime.desc());
+    }
+
+    @Override
+    public void buildRelationship(BatchQuery query, JPAQuery<Batch> jpaQuery) {
+        QBatch qBatch = QBatch.batch; // 查询批次的QueryDSL对象
+        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
+
+        // 处理关联
+        if (query.getIncludes() != null && query.getIncludes().contains(BatchQuery.Include.PRODUCT)) {
+            jpaQuery.leftJoin(qBatch.product, qProduct).fetchJoin();
+        }
     }
 
     /**

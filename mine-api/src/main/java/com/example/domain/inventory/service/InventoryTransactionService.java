@@ -39,32 +39,12 @@ public class InventoryTransactionService implements BaseRepository<InventoryTran
 
 
     @Override
-    public JPAQuery<InventoryTransaction> buildBaseQuery(InventoryTransactionQuery query) {
-
+    public JPAQuery<InventoryTransaction> buildConditionQuery(InventoryTransactionQuery query) {
         QInventoryTransaction qTransaction = QInventoryTransaction.inventoryTransaction; // 查询库存变动记录的QueryDSL对象
-        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
-        QBatch qBatch = QBatch.batch; // 查询批次的QueryDSL对象
-        QOrder qOrder = QOrder.order; // 查询订单的QueryDSL对象
+        
         JPAQuery<InventoryTransaction> jpaQuery = queryFactory
                 .selectFrom(qTransaction)
                 .distinct();
-
-        // 处理关联
-        if (query.getIncludes()
-                 .contains(InventoryTransactionQuery.Include.PRODUCT)) {
-            jpaQuery.leftJoin(qTransaction.product, qProduct)
-                    .fetchJoin();
-        }
-        if (query.getIncludes()
-                 .contains(InventoryTransactionQuery.Include.BATCH)) {
-            jpaQuery.leftJoin(qTransaction.batch, qBatch)
-                    .fetchJoin();
-        }
-        if (query.getIncludes()
-                 .contains(InventoryTransactionQuery.Include.ORDER)) {
-            jpaQuery.leftJoin(qTransaction.order, qOrder)
-                    .fetchJoin();
-        }
 
         // 处理查询条件
         BooleanBuilder where = new BooleanBuilder();
@@ -92,6 +72,31 @@ public class InventoryTransactionService implements BaseRepository<InventoryTran
         return jpaQuery
                 .where(where)
                 .orderBy(qTransaction.transactionTime.desc());
+    }
+
+    @Override
+    public void buildRelationship(InventoryTransactionQuery query, JPAQuery<InventoryTransaction> jpaQuery) {
+        QInventoryTransaction qTransaction = QInventoryTransaction.inventoryTransaction; // 查询库存变动记录的QueryDSL对象
+        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
+        QBatch qBatch = QBatch.batch; // 查询批次的QueryDSL对象
+        QOrder qOrder = QOrder.order; // 查询订单的QueryDSL对象
+        
+        // 处理关联
+        if (query.getIncludes()
+                 .contains(InventoryTransactionQuery.Include.PRODUCT)) {
+            jpaQuery.leftJoin(qTransaction.product, qProduct)
+                    .fetchJoin();
+        }
+        if (query.getIncludes()
+                 .contains(InventoryTransactionQuery.Include.BATCH)) {
+            jpaQuery.leftJoin(qTransaction.batch, qBatch)
+                    .fetchJoin();
+        }
+        if (query.getIncludes()
+                 .contains(InventoryTransactionQuery.Include.ORDER)) {
+            jpaQuery.leftJoin(qTransaction.order, qOrder)
+                    .fetchJoin();
+        }
     }
 
     /**

@@ -41,7 +41,7 @@ export default {
       //   { title: "订单总览", to: "order/list" }
       // ],
       // purchaseItems: [
-      //   { title: "采购记录", to: "StockInData" },
+      //   { title: "采购记录", to: "List" },
       //   { title: "采购计算器", to: "InventoryPurchaseCalculator" }
       // ],
       salesDataItems: [

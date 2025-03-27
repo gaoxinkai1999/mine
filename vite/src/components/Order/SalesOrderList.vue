@@ -85,6 +85,8 @@ import { Clipboard } from '@capacitor/clipboard';
 import api from "@/api";
 import {formatReceipt, printOrder} from "@/utils/printService";
 import {showFailToast, showSuccessToast, showConfirmDialog} from "vant";
+import { useOrderListStore } from "@/stores/orderList";
+import { watch } from 'vue';
 
 export default {
   name: 'SalesOrderList',
@@ -103,6 +105,13 @@ export default {
     }
   },
   emits: ['order-selected'],
+  setup() {
+    const orderListStore = useOrderListStore();
+    
+    return {
+      orderListStore
+    };
+  },
   data() {
     return {
       orders: [],
@@ -139,12 +148,21 @@ export default {
     }
   },
   mounted() {
+    // 监听store中的选择模式变化
+    watch(() => this.orderListStore.isSelectionMode, (newValue) => {
+      if (!newValue) {
+        // 如果选择模式被关闭，清除本地选择状态
+        this.clearSelection();
+      }
+    });
+    
     if (this.shopId) {
       this.filterParams.shopId = this.shopId;
     } else if (!this.customMode) {
-      this.filterParams.shopId = this.$route.query.shopId || null;
-      this.filterParams.startDate = this.$route.query.startDate || null;
-      this.filterParams.endDate = this.$route.query.endDate || null;
+      // 从store获取筛选参数
+      this.filterParams.shopId = this.orderListStore.filterParams.shopId || null;
+      this.filterParams.startDate = this.orderListStore.filterParams.startDate || null;
+      this.filterParams.endDate = this.orderListStore.filterParams.endDate || null;
     }
   },
   watch: {
@@ -155,6 +173,17 @@ export default {
           this.resetAndLoad();
         }
       }
+    },
+    'orderListStore.filterParams': {
+      handler(newVal) {
+        if (!this.customMode) {
+          this.filterParams.shopId = newVal.shopId || null;
+          this.filterParams.startDate = newVal.startDate || null;
+          this.filterParams.endDate = newVal.endDate || null;
+          this.resetAndLoad();
+        }
+      },
+      deep: true
     }
   },
   methods: {

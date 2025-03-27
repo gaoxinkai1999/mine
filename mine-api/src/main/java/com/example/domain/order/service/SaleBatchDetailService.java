@@ -43,18 +43,10 @@ public class SaleBatchDetailService implements BaseRepository<SaleBatchDetail, S
     private final QOrderDetail qOrderDetail = QOrderDetail.orderDetail; // 查询订单详情的QueryDSL对象
 
     @Override
-    public JPAQuery<SaleBatchDetail> buildBaseQuery(SaleBatchDetailQuery query) {
+    public JPAQuery<SaleBatchDetail> buildConditionQuery(SaleBatchDetailQuery query) {
         JPAQuery<SaleBatchDetail> jpaQuery = queryFactory
                 .selectFrom(qSaleBatchDetail)
                 .distinct();
-
-        // 处理关联
-        if (query.getIncludes().contains(SaleBatchDetailQuery.Include.BATCH)) {
-            jpaQuery.leftJoin(qSaleBatchDetail.batch, qBatch).fetchJoin();
-        }
-        if (query.getIncludes().contains(SaleBatchDetailQuery.Include.ORDER_DETAIL)) {
-            jpaQuery.leftJoin(qSaleBatchDetail.orderDetail, qOrderDetail).fetchJoin();
-        }
 
         // 处理查询条件
         BooleanBuilder where = new BooleanBuilder();
@@ -68,6 +60,17 @@ public class SaleBatchDetailService implements BaseRepository<SaleBatchDetail, S
         }
 
         return jpaQuery.where(where);
+    }
+
+    @Override
+    public void buildRelationship(SaleBatchDetailQuery query, JPAQuery<SaleBatchDetail> jpaQuery) {
+        // 处理关联
+        if (query.getIncludes().contains(SaleBatchDetailQuery.Include.BATCH)) {
+            jpaQuery.leftJoin(qSaleBatchDetail.batch, qBatch).fetchJoin();
+        }
+        if (query.getIncludes().contains(SaleBatchDetailQuery.Include.ORDER_DETAIL)) {
+            jpaQuery.leftJoin(qSaleBatchDetail.orderDetail, qOrderDetail).fetchJoin();
+        }
     }
 
     /**
