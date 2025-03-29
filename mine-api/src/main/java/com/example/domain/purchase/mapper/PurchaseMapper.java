@@ -41,6 +41,7 @@ public interface PurchaseMapper {
     @Mapping(source = "product.id", target = "productId")
     @Mapping(source = "product.name", target = "productName")
     @Mapping(source = "batch.id", target = "batchId")
+    @Mapping(source = "product.batchManaged", target = "isBatchManaged")
     PurchaseDetailDto toPurchaseDetailDTO(PurchaseDetail purchaseDetail);
     
     /**

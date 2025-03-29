@@ -1,3 +1,9 @@
+<route>
+{
+name: "shop-detail"
+}
+</route>
+
 <template>
   <div>
     <van-nav-bar
@@ -32,11 +38,7 @@
         <van-button block color="#AF5F4E" style=" margin-top:3vh" @click="setLocation">修改坐标为当前位置</van-button>
       </div>
     </van-cell-group>
-<!--    <van-cell-group inset title="订单">-->
-<!--      <div style=" margin-top:3vh">-->
-<!--        <van-button block style=" margin-top:3vh" type="success" @click="goToOrder">跳转到该商家订单</van-button>-->
-<!--      </div>-->
-<!--    </van-cell-group>-->
+
 
     <!-- 编辑商家弹窗 -->
     <van-dialog
@@ -170,15 +172,7 @@ export default {
       }
     },
 
-    // // 跳转到该商家订单
-    // goToOrder() {
-    //   this.$router.push({
-    //     path: '/AllOrder',
-    //     query: {
-    //       shopId: this.shop.id,
-    //     }
-    //   })
-    // },
+
 
     async findById() {
       this.shop = await api.shop.getShop({id: this.$route.query.id})

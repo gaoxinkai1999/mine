@@ -10,7 +10,6 @@ import com.example.domain.inventory.mapper.InventoryMapper;
 import com.example.domain.inventory.repository.InventoryRepository;
 import com.example.domain.product.dto.ProductStockDTO;
 import com.example.domain.product.entity.Product;
-import com.example.domain.product.entity.QCategory;
 import com.example.domain.product.entity.QProduct;
 import com.example.exception.MyException;
 import com.example.interfaces.BaseRepository;
@@ -334,6 +333,13 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
         }
 
         return allocations;
+    }
+    /**
+     * 删除库存记录
+      */
+    @Transactional
+    public void delete(Integer id) {
+        inventoryRepository.deleteById(id);
     }
 
     /**

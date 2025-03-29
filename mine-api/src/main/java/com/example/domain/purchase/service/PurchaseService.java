@@ -1,7 +1,10 @@
 package com.example.domain.purchase.service;
 
+import com.example.domain.batch.entity.Batch;
+import com.example.domain.batch.entity.QBatch;
 import com.example.domain.batch.service.BatchService;
 import com.example.domain.forecast.service.ForecastService;
+import com.example.domain.inventory.entity.Inventory;
 import com.example.domain.inventory.service.InventoryService;
 import com.example.domain.product.dto.ProductDto;
 import com.example.domain.product.entity.Product;
@@ -17,23 +20,22 @@ import com.example.domain.statistics.dto.response.SalesStatisticsDTO;
 import com.example.domain.statistics.service.StatisticsService;
 import com.example.exception.MyException;
 import com.example.interfaces.BaseRepository;
+import com.example.query.InventoryQuery;
 import com.example.query.ProductQuery;
 import com.example.query.PurchaseQuery;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 采购管理服务
@@ -109,51 +111,6 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
                        .orderBy(qPurchase.createTime.desc());
     }
 
-    @Override
-    public Slice<Purchase> findPage(PurchaseQuery query, Pageable pageable) {
-        // 使用构建的条件查询
-        JPAQuery<Purchase> purchaseJPAQuery = buildConditionQuery(query);
-        
-        // 获取分页结果
-        List<Purchase> fetch = purchaseJPAQuery
-                                .offset(pageable.getOffset())
-                                .limit(pageable.getPageSize() + 1)
-                                .fetch();
-
-        // 判断是否有下一页
-        boolean hasNext = fetch.size() > pageable.getPageSize();
-        if (hasNext) {
-            fetch.removeLast();
-        }
-
-
-        // 获取ID列表
-        List<Integer> ids = fetch.stream()
-                             .map(Purchase::getId)
-                             .collect(Collectors.toList());
-
-        // 重新查询完整数据并加载关联实体
-        PurchaseQuery enrichQuery = PurchaseQuery.builder()
-                                              .ids(ids.toArray(new Integer[0]))
-                                              .includes(query.getIncludes())
-                                              .build();
-                                              
-        List<Purchase> purchases = findList(enrichQuery);
-        
-        // 保持原始排序
-        Map<Integer, Purchase> purchaseMap = purchases.stream()
-                                                     .collect(Collectors.toMap(
-                                                         Purchase::getId, 
-                                                         p -> p
-                                                     ));
-        List<Purchase> sortedPurchases = ids.stream()
-                                          .map(purchaseMap::get)
-                                          .filter(Objects::nonNull)
-                                          .collect(Collectors.toList());
-        
-        return new SliceImpl<>(sortedPurchases, pageable, hasNext);
-    }
-
     /**
      * 根据查询条件构建关联加载
      *
@@ -177,28 +134,12 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
                 jpaQuery.leftJoin(qPurchaseDetail.product, qProduct)
                         .fetchJoin();
             }
+            if (query.getIncludes()
+                     .contains(PurchaseQuery.Include.BATCH)) {
+                jpaQuery.leftJoin(qPurchaseDetail.batch, QBatch.batch)
+                        .fetchJoin();
+            }
         }
-    }
-
-    /**
-     * 获取采购订单列表
-     *
-     * @param query 查询条件
-     * @return 采购订单实体列表
-     */
-    public List<Purchase> getPurchaseList(PurchaseQuery query) {
-        return findList(query);
-    }
-
-    /**
-     * 获取采购订单DTO列表
-     *
-     * @param query 查询条件
-     * @return 采购订单DTO列表
-     */
-    public List<PurchaseDto> getPurchaseDtoList(PurchaseQuery query) {
-        List<Purchase> purchases = findList(query);
-        return purchaseMapper.toPurchaseDTOList(purchases);
     }
 
     /**
@@ -286,10 +227,14 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
                 Product product = item.getProduct();
 
                 if (product.isBatchManaged()) {
-                    // 对于批次商品，需要从对应批次出库
-                    if (item.getBatch() != null) {
-                        inventoryService.stockOut(product, item.getBatch(), item.getQuantity());
-                    }
+                    // 对于批次商品，需要删除对应的批次和库存记录
+                    batchService.deleteBatch(item.getBatch().getId());
+                    Inventory inventory = inventoryService.findOne(InventoryQuery.builder()
+                                                                           .productId(product.getId())
+                                                                           .batchId(item.getBatch()
+                                                                                                  .getId())
+                                                                           .build()).orElseThrow();
+                    inventoryService.delete(inventory.getId());
                 } else {
                     // 对于非批次商品，直接出库
                     inventoryService.stockOut(product, item.getQuantity());
@@ -413,5 +358,77 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
                                                                              .filter(v -> v != null)
                                                                              .count());
         return productIdQuantityMap;
+    }
+
+    /**
+     * 采购单入库处理
+     * 将采购单状态从"已下单"更新为"已入库"，并处理库存入库
+     *
+     * @param purchaseId 采购单ID
+     * @param batchInfoList 批次信息列表，包含生产日期和过期日期
+     */
+    @Transactional
+    public void processPurchaseInStock(Integer purchaseId, List<PurchaseBatchInfo> batchInfoList) {
+        // 1. 查找采购单
+        Purchase purchase = purchaseRepository.findById(purchaseId)
+                .orElseThrow(() -> new MyException("采购单不存在: " + purchaseId));
+
+        // 2. 检查采购单状态
+        if (purchase.getState() != PurchaseState.已下单) {
+            throw new MyException("只有已下单状态的采购单可以入库");
+        }
+
+        // 3. 如果提供了批次信息，先进行验证
+        Map<Integer, PurchaseBatchInfo> batchInfoMap = new HashMap<>();
+        if (batchInfoList != null && !batchInfoList.isEmpty()) {
+            batchInfoList.forEach(info -> batchInfoMap.put(info.getPurchaseDetailId(), info));
+        }
+
+        // 4. 处理每个采购明细的入库
+        for (PurchaseDetail detail : purchase.getPurchaseDetails()) {
+            Product product = detail.getProduct();
+            
+            if (product.isBatchManaged()) {
+                // 批次管理的商品
+                PurchaseBatchInfo batchInfo = batchInfoMap.get(detail.getId());
+                if (batchInfo == null) {
+                    throw new MyException("批次管理商品必须提供批次信息: " + product.getName());
+                }
+                
+                // 创建批次
+                Batch batch = batchService.createBatch(
+                    product, 
+                    detail, 
+                    batchInfo.getProductionDate(), 
+                    batchInfo.getExpirationDate()
+                );
+                
+                // 关联批次到采购明细
+                detail.setBatch(batch);
+                
+                // 入库
+                inventoryService.stockIn(product, batch, detail.getQuantity());
+            } else {
+                // 非批次管理的商品直接入库
+                inventoryService.stockIn(product, detail.getQuantity());
+            }
+        }
+
+        // 5. 更新采购单状态和入库时间
+        purchase.setState(PurchaseState.已入库);
+        purchase.setInTime(LocalDateTime.now());
+        
+        // 6. 保存更新
+        purchaseRepository.save(purchase);
+    }
+
+    /**
+     * 批次信息内部类
+     */
+    @Data
+    public static class PurchaseBatchInfo {
+        private Integer purchaseDetailId; // 采购明细ID
+        private LocalDate productionDate; // 生产日期
+        private LocalDate expirationDate; // 过期日期
     }
 }

@@ -17,6 +17,7 @@ import java.util.Set;
 @Builder
 public class ReturnOrderQuery implements BaseQuery {
     private Integer id;
+    private Integer[] ids;
     
     // 查询条件
     private LocalDate startTime;

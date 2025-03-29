@@ -13,6 +13,7 @@
 
 <script>
 import api from "@/api/index.js";
+import {ROUTE_NAMES} from "@/constants/routeNames.js";
 
 export default {
   name: "PriceRule",
@@ -31,7 +32,7 @@ export default {
 
     goToInfo(id) {
       this.$router.push({
-        path: '/PriceRuleInfo',
+        name: ROUTE_NAMES.PRICE_RULE_DETAIL,
         query: {
           id: id
         }
@@ -39,7 +40,7 @@ export default {
     },
     goToAddPriceRule() {
       this.$router.push({
-        path: '/AddPriceRule'
+        name: ROUTE_NAMES.PRICE_RULE_CREATE
       })
     }
   }

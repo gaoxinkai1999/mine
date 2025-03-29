@@ -1,3 +1,9 @@
+<route>
+{
+  name: "order-sale-new"
+}
+</route>
+
 <template>
   <div class="order-page">
     <!-- 顶部导航栏 -->
@@ -59,11 +65,11 @@
 import { useRouter } from 'vue-router'
 import { useOrderStore } from '@/stores/order'
 import { storeToRefs } from 'pinia'
-import ShopInfo from './ShopInfo.vue'
-import CategorySidebar from './CategorySidebar.vue'
-import ProductList from './ProductList.vue'
-import CartBar from './CartBar.vue'
-import CartPopup from './CartPopup.vue'
+import ShopInfo from './components/ShopInfo.vue'
+import CategorySidebar from './components/CategorySidebar.vue'
+import ProductList from './components/ProductList.vue'
+import CartBar from './components/CartBar.vue'
+import CartPopup from './components/CartPopup.vue'
 import { onMounted, onBeforeUnmount } from 'vue'
 import { showConfirmDialog } from 'vant'
 

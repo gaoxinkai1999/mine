@@ -68,42 +68,8 @@ public class BatchController {
         return batchService.findByProduct(productId, status);
     }
 
-    /**
-     * 禁用批次
-     *
-     * @param batchId 批次ID
-     */
-    @Operation(summary = "禁用批次", description = "将指定批次标记为禁用状态")
-    @PostMapping("/{batchId}/disable")
-    public void disableBatch(@PathVariable Integer batchId) {
-        batchService.disableBatch(batchId);
-    }
 
-    /**
-     * 启用批次
-     *
-     * @param batchId 批次ID
-     */
-    @Operation(summary = "启用批次", description = "将指定批次标记为启用状态")
-    @PostMapping("/{batchId}/enable")
-    public void enableBatch(@PathVariable Integer batchId) {
-        batchService.enableBatch(batchId);
-    }
 
-    /**
-     * 更新批次备注
-     *
-     * @param batchId 批次ID
-     * @param remark 备注内容
-     */
-    @Operation(summary = "更新批次备注", description = "更新指定批次的备注信息")
-    @PostMapping("/{batchId}/remark")
-    public void updateBatchRemark(
-        @PathVariable Integer batchId,
-        @RequestParam String remark
-    ) {
-        batchService.updateBatchRemark(batchId, remark);
-    }
 
     /**
      * 批量更新批次信息

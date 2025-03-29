@@ -1,3 +1,9 @@
+<route>
+{
+  name: "product-order-list"
+}
+</route>
+
 <template>
   <div class="product-order-container">
     <!-- 顶部导航栏 -->

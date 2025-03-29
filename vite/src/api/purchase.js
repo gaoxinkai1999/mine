@@ -97,6 +97,23 @@ const api = {
       method: 'GET',
       params
     })
+  },
+
+  /**
+   * @description 处理采购单入库
+   * @url /purchase/in-stock
+   * @method POST
+   * @param {Object} data Request body
+   * @param {number} data.purchaseId 采购单ID
+   * @param {Array} data.batchInfoList 批次信息列表
+   * @returns {Promise<any>}
+   */
+  processPurchaseInStock(data) {
+    return request({
+      url: '/purchase/in-stock',
+      method: 'POST',
+      data
+    })
   }
 }
 

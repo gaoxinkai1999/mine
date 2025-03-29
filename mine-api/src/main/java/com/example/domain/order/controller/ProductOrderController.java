@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Set;
+
 /**
  * 产品订单控制器
  * 处理产品订单相关的HTTP请求
@@ -52,7 +54,7 @@ public class ProductOrderController {
                 .productId(request.getProductId())
                 .startTime(request.getStartDate())
                 .endTime(request.getEndDate())
-                .includes(OrderDetailQuery.Include.FULL)
+                .includes(Set.of(OrderDetailQuery.Include.ORDER, OrderDetailQuery.Include.PRODUCT, OrderDetailQuery.Include.SHOP))
                 .build();
         
         // 创建分页对象

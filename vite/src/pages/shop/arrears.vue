@@ -1,3 +1,9 @@
+<route>
+{
+  name: "shop-arrears"
+}
+</route>
+
 <template>
   <div>
     <van-nav-bar
@@ -58,6 +64,7 @@
 
 <script>
 import api from "@/api/index.js";
+import {ROUTE_NAMES} from "@/constants/routeNames.js";
 // import {showConfirmDialog, showSuccessToast} from "vant";
 
 export default {
@@ -75,7 +82,7 @@ export default {
   methods: {
     handleClick(id) {
       this.$router.push({
-        path: '/shop/info',
+        name: ROUTE_NAMES.SHOP_DETAIL,
         query: {
           id: id
         }

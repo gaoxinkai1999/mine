@@ -1,3 +1,9 @@
+<route>
+{
+  name: "statistics-daily"
+}
+</route>
+
 <template>
   <van-pull-refresh v-model="loading" @refresh="onRefresh">
     <div class="daily-statistics">

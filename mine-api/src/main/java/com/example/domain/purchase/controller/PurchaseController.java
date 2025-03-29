@@ -5,6 +5,7 @@ import com.example.domain.product.service.ProductService;
 import com.example.domain.purchase.dto.ProductWithPurchaseInfoDto;
 import com.example.domain.purchase.dto.PurchaseCreateRequest;
 import com.example.domain.purchase.dto.PurchaseDto;
+import com.example.domain.purchase.dto.PurchaseInStockRequest;
 import com.example.domain.purchase.dto.PurchaseListRequest;
 import com.example.domain.purchase.entity.Purchase;
 import com.example.domain.purchase.mapper.PurchaseMapper;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 采购控制器
@@ -68,7 +70,7 @@ public class PurchaseController {
                 .state(request.getState())
                 .createTimeStart(request.getCreateTimeStart())
                 .createTimeEnd(request.getCreateTimeEnd())
-                .includes(Set.of(PurchaseQuery.Include.PURCHASE_DETAILS, PurchaseQuery.Include.PRODUCT))
+                .includes(Set.of(PurchaseQuery.Include.PURCHASE_DETAILS, PurchaseQuery.Include.PRODUCT, PurchaseQuery.Include.BATCH))
                 .build();
 
         // 分页参数
@@ -118,5 +120,30 @@ public class PurchaseController {
     @Operation(summary = "获取包含采购信息的在售商品列表")
     public List<ProductWithPurchaseInfoDto> getOnSaleProductsWithPurchaseInfo() {
         return purchaseService.getOnSaleProductsWithPurchaseInfo();
+    }
+
+    /**
+     * 处理采购单入库
+     *
+     * @param request 采购入库请求
+     */
+    @PostMapping("/in-stock")
+    @Operation(summary = "采购单入库")
+    public void processPurchaseInStock(@RequestBody PurchaseInStockRequest request) {
+        // 将PurchaseInStockRequest.BatchInfo转换为PurchaseService.PurchaseBatchInfo
+        List<PurchaseService.PurchaseBatchInfo> batchInfoList = null;
+        if (request.getBatchInfoList() != null && !request.getBatchInfoList().isEmpty()) {
+            batchInfoList = request.getBatchInfoList().stream()
+                .map(batchInfo -> {
+                    PurchaseService.PurchaseBatchInfo purchaseBatchInfo = new PurchaseService.PurchaseBatchInfo();
+                    purchaseBatchInfo.setPurchaseDetailId(batchInfo.getPurchaseDetailId());
+                    purchaseBatchInfo.setProductionDate(batchInfo.getProductionDate());
+                    purchaseBatchInfo.setExpirationDate(batchInfo.getExpirationDate());
+                    return purchaseBatchInfo;
+                })
+                .collect(Collectors.toList());
+        }
+        
+        purchaseService.processPurchaseInStock(request.getPurchaseId(), batchInfoList);
     }
 }

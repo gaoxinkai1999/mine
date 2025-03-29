@@ -11,7 +11,6 @@ import com.example.domain.purchase.entity.PurchaseDetail;
 import com.example.exception.MyException;
 import com.example.interfaces.BaseRepository;
 import com.example.query.BatchQuery;
-import com.example.utils.BatchNumberGenerator;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -20,8 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * 批次管理服务
@@ -33,8 +32,7 @@ public class BatchService implements BaseRepository<Batch, BatchQuery> {
     @Autowired
     private BatchRepository batchRepository; // 批次仓库，用于与数据库交互
 
-    @Autowired
-    private BatchNumberGenerator batchNumberGenerator; // 批次号生成器
+
 
     @Autowired
     private JPAQueryFactory queryFactory; // JPA查询工厂
@@ -106,23 +104,16 @@ public class BatchService implements BaseRepository<Batch, BatchQuery> {
         Batch batch = new Batch();
         batch.setProduct(product);
         batch.setPurchaseDetail(purchaseDetail);
-        batch.setBatchNumber(batchNumberGenerator.generateBatchNumber());
+        batch.setBatchNumber(generateBatchNumber(productionDate));
         batch.setProductionDate(productionDate);
         batch.setExpirationDate(expirationDate);
-        batch.setCostPrice(purchaseDetail.getTotalAmount().divide(new java.math.BigDecimal(purchaseDetail.getQuantity())));
+        batch.setCostPrice(purchaseDetail.getProduct().getCostPrice());
         batch.setStatus(true);
 
         return batchRepository.save(batch);
     }
 
-    /**
-     * 根据批次号查询批次
-     */
-    public Optional<Batch> findByBatchNumber(String batchNumber) {
-        return findOne(BatchQuery.builder()
-            .batchNumber(batchNumber)
-            .build());
-    }
+
 
     /**
      * 查询商品的有效批次
@@ -144,55 +135,16 @@ public class BatchService implements BaseRepository<Batch, BatchQuery> {
             .status(status)
             .build());
     }
-
     /**
-     * 禁用批次
+     * 删除批次
      */
-    @Transactional
-    public void disableBatch(Integer batchId) {
-        Batch batch = findOne(BatchQuery.builder()
-            .id(batchId)
-            .build())
-            .orElseThrow(() -> new MyException("批次不存在: " + batchId));
-        batch.setStatus(false);
-        batchRepository.save(batch);
-    }
-
-    /**
-     * 启用批次
-     */
-    @Transactional
-    public void enableBatch(Integer batchId) {
-        Batch batch = findOne(BatchQuery.builder()
-            .id(batchId)
-            .build())
-            .orElseThrow(() -> new MyException("批次不存在: " + batchId));
-        batch.setStatus(true);
-        batchRepository.save(batch);
-    }
-
-    /**
-     * 更新批次备注
-     */
-    @Transactional
-    public void updateBatchRemark(Integer batchId, String remark) {
-        Batch batch = findOne(BatchQuery.builder()
-            .id(batchId)
-            .build())
-            .orElseThrow(() -> new MyException("批次不存在: " + batchId));
-        batch.setRemark(remark);
-        batchRepository.save(batch);
-    }
-
-    @Transactional
-    public Batch saveBatch(Batch batch) {
-        return batchRepository.save(batch);
-    }
-
     @Transactional
     public void deleteBatch(Integer batchId) {
         batchRepository.deleteById(batchId);
     }
+
+
+
 
     /**
      * 批量更新批次信息
@@ -208,5 +160,11 @@ public class BatchService implements BaseRepository<Batch, BatchQuery> {
             Batch update = batchMapper.partialUpdate(batchUpdateDto, batch);
             batchRepository.save(update);
         }
+    }
+
+
+    private String generateBatchNumber(LocalDate productionDate){
+
+        return productionDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
     }
 } 

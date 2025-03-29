@@ -55,7 +55,8 @@ public class PurchaseQuery implements BaseQuery {
          * 包含采购明细
          */
         PURCHASE_DETAILS,
-        
+
+        BATCH,
         /**
          * 包含商品
          */

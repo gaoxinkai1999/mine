@@ -1,3 +1,9 @@
+<route>
+{
+  name: "statistics-chart"
+}
+</route>
+
 <template>
   <div >
     <van-nav-bar

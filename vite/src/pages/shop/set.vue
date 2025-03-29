@@ -52,6 +52,7 @@
 <script>
 import {Dialog, Toast} from "vant";
 import api from "@/api";
+import {ROUTE_NAMES} from "@/constants/routeNames.js";
 
 export default {
   name: "SetShop",
@@ -93,7 +94,7 @@ export default {
             this.$http.post('shop/updateIsDelById', this.$qs.stringify({id: this.shop.id})).then(() => {
               Toast.success('删除成功');
               this.$router.push({
-                path: '/MyShop',
+                name: ROUTE_NAMES.SHOP_LIST,
               })
             })
 
@@ -106,7 +107,7 @@ export default {
     },
     goToInfo() {
       this.$router.push({
-        path: '/ShopInfo',
+        name: ROUTE_NAMES.SHOP_DETAIL,
         query: {
           id: this.shop.id
         }

@@ -18,7 +18,7 @@ spring:
         format_sql: true
     #        enable_lazy_load_no_trans: false
     #    控制台打印jpa执行的sql
-    show-sql: false
+    show-sql: true
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -63,8 +63,8 @@ springdoc:
     path: /swagger-ui
 
 
-
-logging:
-  level:
-    com.example: debug
+#
+#logging:
+#  level:
+#    com.example: debug
 

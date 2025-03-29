@@ -4,6 +4,7 @@ import api from '@/api'
 import locationService from '@/utils/locationService'
 import {showToast, showSuccessToast, showFailToast} from 'vant'
 import { useRouter } from 'vue-router'
+import { ROUTE_NAMES } from '@/constants/routeNames'
 
 /**
  * 订单管理Store
@@ -252,7 +253,7 @@ export const useReturnOrderStore = defineStore('returnOrder', () => {
             showSuccessToast('退货单提交成功')
             clearCart()
             // 返回订单列表页
-            router.push('/order/list')
+            router.push({ name: ROUTE_NAMES.ORDER_HOME })
             return true
         } catch (error) {
             console.error('退货单提交失败:', error)

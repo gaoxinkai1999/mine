@@ -13,29 +13,34 @@ public class PurchaseDetailDto {
      * 明细ID
      */
     private Integer id;
-    
+
     /**
      * 商品ID
      */
     private Integer productId;
-    
+
     /**
      * 商品名称
      */
     private String productName;
-    
+
     /**
      * 采购数量
      */
     private Integer quantity;
-    
+
     /**
      * 总金额
      */
     private BigDecimal totalAmount;
-    
+
     /**
      * 批次ID
      */
     private Integer batchId;
+    /**
+     * 是否批次管理
+     */
+
+    private Boolean isBatchManaged;
 } 

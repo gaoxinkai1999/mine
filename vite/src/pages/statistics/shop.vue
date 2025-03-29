@@ -1,3 +1,9 @@
+  <route>
+{
+  name: "statistics-shop"
+}
+</route>
+
 <template>
   <div>
 
@@ -16,14 +22,6 @@
           width="45"
       >
       </el-table-column>
-<!--      <el-table-column-->
-<!--          align="center"-->
-<!--          fixed-->
-<!--          label="位置"-->
-<!--          prop="location"-->
-<!--      >-->
-
-<!--      </el-table-column>-->
 
       <el-table-column
           align="center"
@@ -34,18 +32,6 @@
           <span style="color: #474cb6" @click="handleClick(scope.row.shopId)">{{ scope.row.shopName }}</span>
         </template>
       </el-table-column>
-
-
-<!--      <el-table-column-->
-<!--          align="center"-->
-<!--          label="运营天数"-->
-<!--          min-width="50" prop="days" sortable>-->
-<!--      </el-table-column>-->
-<!--      <el-table-column-->
-<!--          align="center"-->
-<!--          label="总订单数"-->
-<!--          min-width="50" prop="totalOrderNum" sortable>-->
-<!--      </el-table-column>-->
 
       <el-table-column
           align="center"
@@ -72,6 +58,7 @@
 <script>
 
 import api from "@/api";
+import {ROUTE_NAMES} from "@/constants/routeNames.js";
 
 export default {
   name: "ShopData",
@@ -104,7 +91,7 @@ export default {
     },
     handleClick(id) {
       this.$router.push({
-        path: '/shop/info',
+        name: ROUTE_NAMES.SHOP_DETAIL,
         query: {
           id: id
         }

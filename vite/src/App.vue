@@ -9,21 +9,18 @@
     </div>
 
     <!-- 底部导航条 -->
-    <van-tabbar v-if="showTabbar" v-model="activeTab" route>
-      <van-tabbar-item icon="home-o" name="index" to="/">首页</van-tabbar-item>
-      <van-tabbar-item icon="orders-o" name="order-list" to="/order/list">全部订单</van-tabbar-item>
-      <van-tabbar-item icon="list-switching" name="tools" to="/mytools">我的工具</van-tabbar-item>
-      <van-tabbar-item icon="user-o" name="mine" to="/mymine">我的</van-tabbar-item>
+    <van-tabbar v-if="showTabbar" v-model="activeTab">
+      <van-tabbar-item icon="home-o" name="index" :to="{ name: ROUTE_NAMES.HOME }">首页</van-tabbar-item>
+      <van-tabbar-item icon="orders-o" name="order-list" :to="{ name: ROUTE_NAMES.ORDER_HOME }">全部订单</van-tabbar-item>
+      <van-tabbar-item icon="list-switching" name="tools" :to="{ name: ROUTE_NAMES.TOOLS }">我的工具</van-tabbar-item>
+      <van-tabbar-item icon="user-o" name="mine" :to="{ name: ROUTE_NAMES.MINE }">我的</van-tabbar-item>
     </van-tabbar>
 
-    <!-- 浮动气泡按钮 - 新建订单 -->
-    <van-floating-bubble
-        v-if="showFloatingButton"
-        v-model:offset="bubbleOffset"
-        axis="xy"
-        icon="plus"
-        magnetic="x"
-        @click="navigateToNewOrder"
+    <!-- 使用封装的ActionBubble组件 -->
+    <ActionBubble 
+      :show="showFloatingButton"
+      :items="actionItems"
+      @navigate="handleNavigate"
     />
   </div>
 </template>
@@ -34,6 +31,8 @@ import {useRouter, useRoute} from 'vue-router';
 import {App as CapApp} from '@capacitor/app';
 import {showConfirmDialog} from "vant";
 import {useMyStore} from '@/stores/defineStore.js';
+import { ROUTE_NAMES } from '@/constants/routeNames';
+import ActionBubble from '@/pages/components/ActionBubble.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -48,69 +47,79 @@ const apkUrl = 'http://update.abocidee.com/updates/app-release.apk'; // 真实�
 
 checkForUpdates()
 
-
-
-
-
 // Tabbar 激活状态
 const activeTab = ref('index');
 
-// 浮动气泡位置设置 - 定义初始位置
-const bubbleOffset = ref({ y: 1400 }); // 先初始化，稍后动态计算
-
 // 计算是否显示Tabbar
 const showTabbar = computed(() => {
-  // 只在这些精确路径上显示Tabbar
-  const tabbarPaths = [
-    '/',
-    '/index',
-    '/order/list',
-    '/mytools',
-    '/mymine'
+  // 只在这些精确路由名称上显示Tabbar
+  const tabbarRouteNames = [
+    ROUTE_NAMES.HOME,
+    ROUTE_NAMES.ORDER_HOME,
+    ROUTE_NAMES.TOOLS,
+    ROUTE_NAMES.MINE
   ];
 
-  // 返回当前路径是否精确匹配tabbar路径
-  return tabbarPaths.includes(route.path);
+  // 返回当前路由名称是否匹配
+  return tabbarRouteNames.includes(route.name);
 });
 
 // 计算是否显示浮动按钮
 const showFloatingButton = computed(() => {
-  // 只在这些指定路径上显示浮动按钮
-  const floatingButtonPaths = ['/', '/index', '/order/list', '/mytools', '/mymine'];
-  
-  // 检查当前路径或父路径是否包含 new 订单路径
-  if (route.path.includes('/order') && route.path.includes('/new')) {
+  // 只在这些指定路由名称上显示浮动按钮
+  const floatingButtonRouteNames = [
+    ROUTE_NAMES.HOME,
+    ROUTE_NAMES.ORDER_HOME,
+    ROUTE_NAMES.TOOLS,
+    ROUTE_NAMES.MINE
+  ];
+
+  // 检查是否为新建订单页面
+  if (route.name === ROUTE_NAMES.ORDER_SALE_NEW || route.name === ROUTE_NAMES.ORDER_RETURN_NEW) {
     return false;
   }
-  
-  // 返回当前路径是否在显示列表中
-  return floatingButtonPaths.includes(route.path);
+
+  // 返回当前路由名称是否在显示列表中
+  return floatingButtonRouteNames.includes(route.name);
 });
 
-// 计算浮动气泡的位置
-const calculateBubblePosition = () => {
-  const screenHeight = window.innerHeight;
-  // 将气泡定位在屏幕高度的40%处，这样会更靠上
-  bubbleOffset.value = { 
-    y: Math.round(screenHeight * 0.7)
-  };
-};
+// 操作项数据
+const actionItems = [
+  { 
+    text: '销售订单', 
+    icon: 'cart-o', 
+    routeName: ROUTE_NAMES.ORDER_SALE_NEW,
+    class: 'action-item-sales'
+  },
+  { 
+    text: '退货订单', 
+    icon: 'revoke', 
+    routeName: ROUTE_NAMES.ORDER_RETURN_NEW,
+    class: 'action-item-return'
+  },
+  { 
+    text: '采购订单', 
+    icon: 'shopping-cart-o', 
+    routeName: ROUTE_NAMES.PURCHASE_NEW,
+    class: 'action-item-purchase'
+  }
+];
 
-// 导航到新建订单页面
-const navigateToNewOrder = () => {
-  router.push('/order/sale/new');
+// 处理ActionBubble的导航事件
+const handleNavigate = (routeName) => {
+  router.push({ name: routeName });
 };
 
 // 监听路由变化更新activeTab
-watch(() => route.path, (newPath) => {
-  if (newPath === '/' || newPath === '/index') {
+watch(() => route.name, (newName) => {
+  if (newName === ROUTE_NAMES.HOME) {
     activeTab.value = 'index';
-  } else if (newPath.includes('/order/list')) {
+  } else if (newName === ROUTE_NAMES.ORDER_HOME || newName?.startsWith('order-')) {
     activeTab.value = 'order-list';
-  } else if (newPath.includes('/mymine')) {
+  } else if (newName === ROUTE_NAMES.MINE) {
     activeTab.value = 'mine';
-  } else if (newPath.includes('/mytools')) {
-    activeTab.value = 'mine';
+  } else if (newName === ROUTE_NAMES.TOOLS) {
+    activeTab.value = 'tools';
   }
 }, {immediate: true});
 
@@ -142,13 +151,6 @@ const handleBackButton = ({canGoBack}) => {
 
 // 初始化
 onMounted(async () => {
-
-  // 计算初始气泡位置
-  calculateBubblePosition();
-  
-  // 监听屏幕尺寸变化，重新计算气泡位置
-  window.addEventListener('resize', calculateBubblePosition);
-
   // 添加返回按钮监听
   CapApp.addListener('backButton', handleBackButton);
 
@@ -202,7 +204,7 @@ html, body {
   .has-tabbar {
     padding-bottom: calc(var(--van-tabbar-height) + env(safe-area-inset-bottom, 0px)) !important;
   }
-  
+
   .content-with-tabbar {
     margin-bottom: calc(var(--van-tabbar-height) + env(safe-area-inset-bottom, 0px)) !important;
   }
@@ -238,16 +240,6 @@ html, body {
   transform: scale(1.1);
 }
 
-/* 自定义浮动按钮样式 */
-.van-floating-bubble {
-  --van-floating-bubble-background: #1989fa;
-  --van-floating-bubble-color: #fff;
-  --van-floating-bubble-shadow: 0 0 10px rgba(25, 137, 250, 0.3);
-  right: 16px;
-  bottom: calc(var(--van-tabbar-height) + 36px);
-  z-index: 101;
-}
-
 /* 修复Safari中的滚动问题 */
 @supports (-webkit-touch-callout: none) {
   body, .app-container, .main-content {
@@ -260,10 +252,6 @@ html, body {
   .van-tabbar {
     padding-bottom: env(safe-area-inset-bottom);
     height: calc(var(--van-tabbar-height) + env(safe-area-inset-bottom));
-  }
-  
-  .van-floating-bubble {
-    bottom: calc(var(--van-tabbar-height) + 36px + env(safe-area-inset-bottom));
   }
 }
 </style>

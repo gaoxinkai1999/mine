@@ -85,6 +85,9 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
         if (query.getId() != null) {
             where.and(qReturnOrder.id.eq(query.getId()));
         }
+        if (query.getIds() != null) {
+            where.and(qReturnOrder.id.in(query.getIds()));
+        }
 
         if (query.getShopId() != null) {
             where.and(qReturnOrder.shop.id.eq(query.getShopId()));

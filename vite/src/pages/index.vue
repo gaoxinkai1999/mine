@@ -1,3 +1,9 @@
+<route>
+{
+  name: "home"
+}
+</route>
+
 <template>
   <div class="delivery-system">
     <!-- 顶部区域 -->
@@ -17,7 +23,7 @@
         <router-link
             v-for="(item, index) in menuItems"
             :key="index"
-            :to="item.to"
+            :to="{ name: item.name }"
             class="menu-card"
         >
           <div class="menu-card-content">
@@ -45,6 +51,7 @@
 <script>
 import { ref, onMounted } from 'vue';
 import APP_VERSION from '@/../version.json'
+import { ROUTE_NAMES } from '@/constants/routeNames';
 
 export default {
   name: 'HomePage',
@@ -55,12 +62,9 @@ export default {
     
     // 功能菜单项
     const menuItems = ref([
-      { text: '采购管理', icon: 'cart-o', to: '/purchase/create' },
-      { text: '采购历史', icon: 'cart-o', to: '/purchase/list' },
-      { text: '库存管理', icon: 'label-o', to: '/product/inventory' },
-      { text: '订单管理', icon: 'orders-o', to: '/order/list' },
-      { text: '新建商家', icon: 'user-o', to: '/shop/create' },
-      { text: '新建退货订单', icon: 'user-o', to: '/order/return/new' }
+      { text: '采购历史', icon: 'cart-o', name: ROUTE_NAMES.PURCHASE_LIST },
+      { text: '库存管理', icon: 'label-o', name: ROUTE_NAMES.PRODUCT_INVENTORY },
+      { text: '新建商家', icon: 'user-o', name: ROUTE_NAMES.SHOP_CREATE },
     ]);
     
     onMounted(() => {

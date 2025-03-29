@@ -35,6 +35,7 @@
   </div>
 </template>
 <script>
+import {ROUTE_NAMES} from "@/constants/routeNames.js";
 export default {
   name: "AddPriceRule",
   data() {
@@ -67,7 +68,7 @@ export default {
       this.$http.post('/priceRule/add', this.PriceRule).then(res => {
         console.log(res)
         this.$router.push({
-          path: '/Lsit'
+          name: ROUTE_NAMES.PRICE_RULE_LIST
         })
       })
     }

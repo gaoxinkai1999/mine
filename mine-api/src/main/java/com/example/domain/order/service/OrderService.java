@@ -23,9 +23,6 @@ import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -80,6 +77,9 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
         // 如果查询参数中包含订单ID，则添加ID查询条件
         if (query.getId() != null) {
             where.and(qOrder.id.eq(query.getId()));
+        }
+        if (query.getIds() != null) {
+            where.and(qOrder.id.in(query.getIds()));
         }
 
         // 如果查询参数中包含开始时间和结束时间，则添加时间区间查询条件
@@ -144,63 +144,7 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
         }
     }
 
-    @Override
-    public Slice<Order> findPage(OrderQuery query, Pageable pageable){
-        QOrder qOrder = QOrder.order; // 查询订单的QueryDSL对象
-        QOrderDetail qOrderDetail = QOrderDetail.orderDetail; // 查询订单详情的QueryDSL对象
-        QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
-        QShop qShop = QShop.shop; // 查询商店的QueryDSL对象
-        QPriceRule qPriceRule = QPriceRule.priceRule; // 查询价格规则的QueryDSL对象
 
-        // 初始化查询对象
-        JPAQuery<Integer> jpaQuery = queryFactory
-                .select(qOrder.id)
-                .from(qOrder);
-
-        // 处理查询条件
-        // 根据查询参数构建where条件，以精确查询
-        BooleanBuilder where = new BooleanBuilder();
-        // 如果查询参数中包含订单ID，则添加ID查询条件
-        if (query.getId() != null) {
-            where.and(qOrder.id.eq(query.getId()));
-        }
-
-        // 如果查询参数中包含开始时间和结束时间，则添加时间区间查询条件
-        if (query.getStartTime() != null && query.getEndTime() != null) {
-            where.and(qOrder.createTime.between(
-                    query.getStartTime()
-                         .atStartOfDay(),
-                    query.getEndTime()
-                         .atTime(23, 59, 59)
-            ));
-        }
-
-        // 如果查询参数中包含店铺ID，则添加店铺ID查询条件
-        if (query.getShopId() != null) {
-            where.and(qOrder.shop.id.eq(query.getShopId()));
-        }
-
-        // 执行分页查询
-        List<Integer> content = jpaQuery.where(where).orderBy(qOrder.createTime.desc())
-                                        .offset(pageable.getOffset())
-                                        .limit(pageable.getPageSize() + 1)
-                                        .fetch();
-
-        boolean hasNext = content.size() > pageable.getPageSize();
-        if (hasNext) {
-            content.removeLast();
-        }
-        JPAQuery<Order> jpaQueryEntity = queryFactory
-                .selectFrom(qOrder)
-                .where(qOrder.id.in(content)).orderBy(qOrder.createTime.desc());
-                
-        // 为结果加载关联对象
-        buildRelationship(query, jpaQueryEntity);
-        
-        List<Order> orders = jpaQueryEntity.fetch();
-
-        return new SliceImpl<>(orders, pageable, hasNext);
-    }
     /**
      * 创建新订单
      *

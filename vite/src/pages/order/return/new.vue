@@ -1,3 +1,9 @@
+<route>
+{
+  name: "order-return-new"
+}
+</route>
+
 <template>
   <div class="return-order-page">
     <!-- 顶部导航栏 -->
@@ -52,15 +58,16 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { useReturnOrderStore } from '@/stores/returnOrder'
+import { useReturnOrderStore } from '@/stores/returnOrder.js'
 import { storeToRefs } from 'pinia'
-import ShopInfo from './ShopInfo.vue'
-import CategorySidebar from './CategorySidebar.vue'
-import ProductList from './ProductList.vue'
-import CartBar from './CartBar.vue'
-import CartPopup from './CartPopup.vue'
+import ShopInfo from './components/ShopInfo.vue'
+import CategorySidebar from './components/CategorySidebar.vue'
+import ProductList from './components/ProductList.vue'
+import CartBar from './components/CartBar.vue'
+import CartPopup from './components/CartPopup.vue'
 import { onMounted, onBeforeUnmount } from 'vue'
 import { showConfirmDialog } from 'vant'
+import { ROUTE_NAMES } from '@/constants/routeNames'
 
 const router = useRouter()
 const store = useReturnOrderStore()

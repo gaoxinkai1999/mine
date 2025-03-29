@@ -63,33 +63,11 @@ export const useOrderListStore = defineStore('orderList', () => {
     if (params.shopName !== undefined) filterParams.value.shopName = params.shopName
     if (params.startDate !== undefined) filterParams.value.startDate = params.startDate
     if (params.endDate !== undefined) filterParams.value.endDate = params.endDate
-    
-    // 保存到localStorage
-    saveFiltersToLocalStorage()
+
   }
   
-  /**
-   * 清除商店筛选
-   */
-  function clearShopFilter() {
-    filterParams.value.shopId = null
-    filterParams.value.shopName = ''
-    
-    // 保存到localStorage
-    saveFiltersToLocalStorage()
-  }
-  
-  /**
-   * 清除日期筛选
-   */
-  function clearDateFilter() {
-    filterParams.value.startDate = null
-    filterParams.value.endDate = null
-    
-    // 保存到localStorage
-    saveFiltersToLocalStorage()
-  }
-  
+
+
   /**
    * 清除所有筛选
    */
@@ -98,57 +76,12 @@ export const useOrderListStore = defineStore('orderList', () => {
     filterParams.value.shopName = ''
     filterParams.value.startDate = null
     filterParams.value.endDate = null
-    
-    // 保存到localStorage
-    saveFiltersToLocalStorage()
+
   }
+
   
-  /**
-   * 清除日期范围
-   */
-  function clearDateRange() {
-    filterParams.value.startDate = null
-    filterParams.value.endDate = null
-  }
-  
-  /**
-   * 保存筛选条件到localStorage
-   */
-  function saveFiltersToLocalStorage() {
-    try {
-      const filters = {}
-      
-      if (filterParams.value.shopId) filters.shopId = filterParams.value.shopId
-      if (filterParams.value.shopName) filters.shopName = filterParams.value.shopName
-      if (filterParams.value.startDate) filters.startDate = filterParams.value.startDate
-      if (filterParams.value.endDate) filters.endDate = filterParams.value.endDate
-      
-      localStorage.setItem('orderFilters', JSON.stringify(filters))
-    } catch (error) {
-      console.error('保存筛选条件到localStorage出错:', error)
-    }
-  }
-  
-  /**
-   * 从localStorage加载筛选条件
-   */
-  function loadFiltersFromLocalStorage() {
-    try {
-      const savedFilters = localStorage.getItem('orderFilters')
-      if (savedFilters) {
-        const parsedFilters = JSON.parse(savedFilters)
-        
-        if (parsedFilters.shopId) filterParams.value.shopId = parsedFilters.shopId
-        if (parsedFilters.shopName) filterParams.value.shopName = parsedFilters.shopName
-        if (parsedFilters.startDate) filterParams.value.startDate = parsedFilters.startDate
-        if (parsedFilters.endDate) filterParams.value.endDate = parsedFilters.endDate
-      }
-    } catch (error) {
-      console.error('从localStorage加载筛选条件出错:', error)
-      // 清除可能损坏的数据
-      localStorage.removeItem('orderFilters')
-    }
-  }
+
+
   
   /**
    * 开始多选模式
@@ -245,12 +178,7 @@ export const useOrderListStore = defineStore('orderList', () => {
     
     // 方法
     setFilterParams,
-    clearShopFilter,
-    clearDateFilter,
     clearAllFilters,
-    clearDateRange,
-    saveFiltersToLocalStorage,
-    loadFiltersFromLocalStorage,
     startSelection,
     cancelSelection,
     handleOrderSelected,
