@@ -21,7 +21,6 @@ name: "shop-detail"
       <van-cell :value="shop.name" size="large" title="商家名"/>
 
 
-      <van-cell :value="shop.priceRule.name" size="large" title="价格规则"/>
 
 
       <van-field v-model="shop.arrears" input-align="right" label="欠款" size="large" type="digit"
@@ -57,30 +56,10 @@ name: "shop-detail"
               :rules="[{ required: true, message: '请输入商家名称' }]"
             />
 
-            <van-field
-              v-model="editForm.priceRule.name"
-              is-link
-              readonly
-              label="价格规则"
-              placeholder="请选择价格规则"
-              @click="showPriceRulePicker = true"
-            />
           </van-cell-group>
         </van-form>
       </div>
     </van-dialog>
-
-    <!-- 价格规则选择器弹窗 -->
-    <van-popup v-model:show="showPriceRulePicker" position="bottom" round>
-      <van-picker
-        :columns="priceRules"
-        :columns-field-names=customFieldName
-        @confirm="onPriceRuleConfirm"
-        @cancel="showPriceRulePicker = false"
-        show-toolbar
-        title="选择价格规则"
-      />
-    </van-popup>
   </div>
 </template>
 
@@ -111,31 +90,15 @@ export default {
       shop: '',
       orders: [],
       showEditDialog: false,
-      showPriceRulePicker: false,
-      priceRules: [],
       editForm: {
         name: '',
-        priceRule: { name: '', id: null }
       },
-      customFieldName : {
-        text: 'name',
-      }
     }
   },
   async mounted() {
     await this.findById()
-    await this.loadPriceRules()
   },
   methods: {
-    async loadPriceRules() {
-      try {
-        // 假设这是获取价格规则的API
-        const response = await api.pricerule.getSimplePriceRules()
-        this.priceRules = response
-      } catch (error) {
-        showToast('获取价格规则失败')
-      }
-    },
 
     handleBeforeClose(action) {
       if (action === 'confirm') {
@@ -144,17 +107,12 @@ export default {
       return true
     },
 
-    onPriceRuleConfirm({selectedOptions}) {
-      this.editForm.priceRule = selectedOptions
-      this.showPriceRulePicker = false
-    },
 
     async updateShop() {
       try {
         await api.shop.update([{
           id: this.shop.id,
           name: this.editForm.name,
-          priceRuleId: this.editForm.priceRule.id
         }])
         
         showToast({
@@ -179,7 +137,6 @@ export default {
       // 初始化编辑表单
       this.editForm = {
         name: this.shop.name,
-        priceRule: { ...this.shop.priceRule }
       }
     },
 

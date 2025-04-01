@@ -1,10 +1,10 @@
 <template>
-
   <div class="product-list">
+    <van-empty v-if="store.currentFoods.length === 0" description="没有找到商品"/>
     <van-card
-        v-for="(item, index) in products"
+        v-for="(item, index) in store.currentFoods"
         :key="index"
-        :price="`${item.price}`"
+        :price="`${item.defaultSalePrice}`"
         :title="item.name"
     >
       <template #tags>
@@ -26,21 +26,13 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'ProductList',
-  props: {
-    products: {
-      type: Array,
-      required: true,
-      default: () => []
-    }
-  },
-  methods: {
-    handleChange(item) {
-      this.$emit('update-cart', item)
-    }
-  }
+<script setup>
+import {useOrderStore} from '@/stores/order'
+
+const store = useOrderStore()
+
+const handleChange = (item) => {
+  store.updateCart(item)
 }
 </script>
 <style scoped>

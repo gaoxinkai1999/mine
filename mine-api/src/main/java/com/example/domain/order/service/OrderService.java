@@ -6,7 +6,6 @@ import com.example.domain.inventory.service.InventoryService;
 import com.example.domain.order.dto.OrderCreateRequest;
 import com.example.domain.order.entity.*;
 import com.example.domain.order.repository.OrderRepository;
-import com.example.domain.price.entity.QPriceRule;
 import com.example.domain.product.entity.Product;
 import com.example.domain.product.entity.QProduct;
 import com.example.domain.product.service.ProductService;
@@ -26,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -115,7 +115,6 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
         QOrderDetail qOrderDetail = QOrderDetail.orderDetail; // 查询订单详情的QueryDSL对象
         QProduct qProduct = QProduct.product; // 查询产品的QueryDSL对象
         QShop qShop = QShop.shop; // 查询商店的QueryDSL对象
-        QPriceRule qPriceRule = QPriceRule.priceRule; // 查询价格规则的QueryDSL对象
 
         // 处理关联
         // 如果查询参数中包含店铺信息，则左连接店铺表，并根据条件进一步连接价格规则表
@@ -123,11 +122,6 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                  .contains(OrderQuery.Include.SHOP)) {
             jpaQuery.leftJoin(qOrder.shop, qShop)
                     .fetchJoin();
-            if (query.getIncludes()
-                     .contains(OrderQuery.Include.PRICE_RULE)) {
-                jpaQuery.leftJoin(qShop.priceRule, qPriceRule)
-                        .fetchJoin();
-            }
         }
 
         // 如果查询参数中包含订单详情，则左连接订单详情表，并根据条件进一步连接产品表
@@ -164,26 +158,46 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
         for (OrderCreateRequest.OrderItemRequest itemRequest : request.getItems()) {
             // 获取商品信息
             Product product = productService.findOne(ProductQuery.builder()
-                                                                 .id(itemRequest.getProductId())
-                                                                 .build())
-                                            .orElseThrow(() -> new MyException("商品不存在: " + itemRequest.getProductId()));
+                                                               .id(itemRequest.getProductId())
+                                                               .build())
+                                           .orElseThrow(() -> new MyException("商品不存在: " + itemRequest.getProductId()));
+            
+            // === 开始价格校验 ===
+            BigDecimal requestedPrice = itemRequest.getPrice();
+            BigDecimal defaultPrice = product.getDefaultSalePrice();
+            BigDecimal costPrice = product.getCostPrice();
+            
+            // 1. 校验价格非负
+            if (requestedPrice == null || requestedPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new MyException("商品 [" + product.getName() + "] 销售价格必须大于0");
+            }
 
+            // 2. 校验价格是否低于成本价
+            if (requestedPrice.compareTo(costPrice) < 0) {
+                throw new MyException("商品 [" + product.getName() + "] 销售价格 (" + requestedPrice +
+                                    ") 不能低于成本价 (" + costPrice + ")");
+            }
+
+            // 3. 设置isDefaultPrice标记
+            boolean isDefaultPrice = requestedPrice.compareTo(defaultPrice) == 0;
+            
             // 创建订单详情
             OrderDetail orderDetail = order.createOrderDetail(product, itemRequest);
+            orderDetail.setDefaultPrice(isDefaultPrice);
 
             // 处理批次商品
             if (product.isBatchManaged()) {
                 // 如果没有指定批次信息，使用FIFO自动分配
                 if (itemRequest.getBatchDetails() == null || itemRequest.getBatchDetails().isEmpty()) {
-                    List<InventoryService.BatchAllocation> allocations = 
+                    List<InventoryService.BatchAllocation> allocations =
                         inventoryService.findAvailableBatchesByFifo(product, itemRequest.getQuantity());
                     
                     // 根据FIFO分配结果创建批次销售明细
                     for (InventoryService.BatchAllocation allocation : allocations) {
                         orderDetail.addBatchDetail(
-                            allocation.getBatch(), 
-                            allocation.getQuantity(), 
-                            itemRequest.getPrice()
+                            allocation.getBatch(),
+                            allocation.getQuantity(),
+                            requestedPrice
                         );
                         // 扣减库存
                         inventoryService.stockOut(product, allocation.getBatch(), allocation.getQuantity());
@@ -197,7 +211,7 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                         Batch batch = batchService.findOne(batchQuery)
                                                   .orElseThrow(() -> new MyException("批次不存在: " + batchDetail.getBatchNumber()));
 
-                        orderDetail.addBatchDetail(batch, batchDetail.getQuantity(), itemRequest.getPrice());
+                        orderDetail.addBatchDetail(batch, batchDetail.getQuantity(), requestedPrice);
                         inventoryService.stockOut(product, batch, batchDetail.getQuantity());
                     }
                 }

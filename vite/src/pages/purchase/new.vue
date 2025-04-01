@@ -105,17 +105,10 @@
           <span>合计:</span>
           <span class="cart-total-amount">¥{{ formatAmount(totalAmount) }}</span>
         </div>
-        <van-button
-            type="primary"
-            round
-            :disabled="!purchaseList.length"
-            @click="showBudgetDialog=true"
-        >
-          设置预算
-        </van-button>
+
         <van-button 
           type="primary" 
-
+          block
           round 
           :disabled="!purchaseList.length"
           @click="submitOrder"

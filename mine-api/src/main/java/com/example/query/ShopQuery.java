@@ -28,15 +28,12 @@ public class ShopQuery implements BaseQuery {
 
     // 预定义关联选项
     public static class Include {
-        public static final String PRICE_RULE = "priceRule";
         public static final String PRODUCT = "product";
-        public static final String PRICE_RULE_DETAIL = "priceRuleDetail";
         public static final String ORDERS = "orders";
 
         // 常用组合
         public static Set<String> BASIC = Collections.emptySet();
-        public static Set<String> WITH_PRICE_RULE = Set.of(PRICE_RULE);
         public static Set<String> WITH_ORDERS = Set.of(ORDERS);
-        public static Set<String> FULL = Set.of(PRICE_RULE, ORDERS);
+        public static Set<String> FULL = Set.of(ORDERS);
     }
 }

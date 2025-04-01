@@ -1,7 +1,6 @@
 package com.example.domain.shop.entity;
 
 import com.example.domain.order.entity.Order;
-import com.example.domain.price.entity.PriceRule;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -38,9 +37,6 @@ public class Shop {
     @Column(name = "is_del", nullable = false)
     private boolean isDel = false;
 
-    @ToString.Exclude
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    private PriceRule priceRule;
 
     @Column(name = "arrears", nullable = false)
     private BigDecimal arrears=BigDecimal.ZERO;

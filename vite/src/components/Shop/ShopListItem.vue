@@ -23,7 +23,6 @@
             <template #title>
               <div style="display: flex; align-items: center;">
                 <span style="flex-shrink: 0; min-width:35vw;">{{ shop.name }}</span>
-                <van-tag :color="shop.priceRule.color">{{ shop.priceRule.name }}</van-tag>
 
               </div>
             </template>
@@ -42,7 +41,7 @@
         <template #title>
           <div style="display: flex; align-items: center;">
             <span style="flex-shrink: 0; min-width:35vw;">{{ shop.name }}</span>
-            <van-tag :color="shop.priceRule.color">{{ shop.priceRule.name }}</van-tag>
+
           </div>
         </template>
       </van-cell>
@@ -122,10 +121,6 @@ export default {
               id: shop.id,
               name: shop.name,
               location: shop.location,
-              priceRule: {
-                color: shop.priceRule.color,
-                name: shop.priceRule.name
-              }
 
               // 其他需要展示的字段...
             }))

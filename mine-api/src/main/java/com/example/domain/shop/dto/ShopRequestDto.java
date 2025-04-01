@@ -25,5 +25,4 @@ public class ShopRequestDto implements Serializable {
     private BigDecimal arrears;
     private BigDecimal longitude;
     private BigDecimal latitude;
-    private Integer priceRuleId;
 }

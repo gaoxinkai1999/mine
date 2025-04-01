@@ -41,15 +41,8 @@ export default {
       productItems: [
         { title: "商品总览", name: ROUTE_NAMES.PRODUCT_LIST },
         { title: "库存管理", name: ROUTE_NAMES.PRODUCT_INVENTORY },
-        { title: "价格规则", name: ROUTE_NAMES.PRICE_RULE_LIST }
       ],
-      // orderItems: [
-      //   { title: "订单总览", name: ROUTE_NAMES.ORDER_SALE_LIST }
-      // ],
-      // purchaseItems: [
-      //   { title: "采购记录", name: ROUTE_NAMES.PURCHASE_LIST },
-      //   { title: "采购计算器", name: "InventoryPurchaseCalculator" }
-      // ],
+
       salesDataItems: [
         { title: "月销售数据", name: ROUTE_NAMES.STATISTICS_MONTHLY },
         { title: "每日销售数据", name: ROUTE_NAMES.STATISTICS_DAILY }

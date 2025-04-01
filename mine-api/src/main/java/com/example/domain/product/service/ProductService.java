@@ -4,10 +4,7 @@ import com.example.domain.batch.service.BatchService;
 import com.example.domain.inventory.entity.Inventory;
 import com.example.domain.inventory.repository.InventoryRepository;
 import com.example.domain.inventory.service.InventoryService;
-import com.example.domain.price.entity.PriceRuleDetail;
-import com.example.domain.price.service.PriceRuleService;
 import com.example.domain.product.dto.ProductDto;
-import com.example.domain.product.dto.ProductSaleInfoDTO;
 import com.example.domain.product.dto.ProductStockDTO;
 import com.example.domain.product.dto.ProductUpdateDto;
 import com.example.domain.product.entity.Product;
@@ -15,13 +12,11 @@ import com.example.domain.product.entity.QCategory;
 import com.example.domain.product.entity.QProduct;
 import com.example.domain.product.mapper.ProductMapper;
 import com.example.domain.product.repository.ProductRepository;
-import com.example.domain.shop.entity.Shop;
 import com.example.domain.shop.service.ShopService;
 import com.example.exception.MyException;
 import com.example.interfaces.BaseRepository;
 import com.example.query.CategoryQuery;
 import com.example.query.ProductQuery;
-import com.example.query.ShopQuery;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -47,8 +42,6 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
     private ProductRepository productRepository; // 产品仓库，用于与数据库交互
     @Autowired
     private JPAQueryFactory queryFactory; // JPA查询工厂
-    @Autowired
-    private PriceRuleService priceRuleService; // 价格规则服务
     @Autowired
     private CategoryService categoryService;
     @Lazy
@@ -205,54 +198,7 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
         // 这里可以添加更多关联加载逻辑，如果有需要的话
     }
 
-    /**
-     * 获取在售商品列表，包含库存信息
-     *
-     * @param shopId 店铺ID
-     * @return 商品销售信息列表
-     */
-    public List<ProductSaleInfoDTO> getProductSaleList(Integer shopId) {
-        // 1. 获取店铺信息
-        ShopQuery shopQuery = ShopQuery.builder()
-                                       .id(shopId)
-                                       .includes(Set.of(ShopQuery.Include.PRICE_RULE))
-                                       .build();
-        Shop shop = shopService.findOne(shopQuery)
-                               .orElseThrow(() -> new MyException("店铺不存在: " + shopId));
 
-        // 提取价格规则信息
-        List<PriceRuleDetail> priceRuleDetails = shop.getPriceRule()
-                                                     .getPriceRuleDetails();
-
-        // 2. 获取所有在售商品信息，包含库存信息
-        List<ProductDto> productDtos = getProducts();
-        // 3. 将基础的包含库存的ProductDto 转化为 包含对应价格规则信息的ProductSaleInfoDTO
-        return productDtos.stream()
-                          .map(productDto -> {
-                              // 转换基础信息
-                              ProductSaleInfoDTO productSaleInfoDTO = productMapper.productDtotoProductSaleInfoDTO(productDto);
-                              // 获取对应价格规则
-                              priceRuleDetails.stream()
-                                              // 过滤出当前商品的价格规则
-                                              .filter((priceRuleDetail) -> priceRuleDetail.getProduct()
-                                                                                          .getId() == productSaleInfoDTO.getId())
-                                              .findFirst()
-                                              .ifPresentOrElse((priceRuleDetail) -> {
-                                                  productSaleInfoDTO.setDiscounted(true);
-                                                  productSaleInfoDTO.setPrice(priceRuleDetail.getPrice());
-                                              }, () -> {
-                                                  productSaleInfoDTO.setDiscounted(false);
-                                                  productSaleInfoDTO.setPrice(productDtos.stream()
-                                                                                         .filter((product) -> product.getId() == productSaleInfoDTO.getId())
-                                                                                         .findFirst()
-                                                                                         .orElseThrow(() -> new MyException("价格规则不存在"))
-                                                                                         .getDefaultSalePrice());
-                                              });
-
-                              return productSaleInfoDTO;
-                          })
-                          .toList();
-    }
 
     /**
      * 获取所有在售商品信息，包含库存信息

@@ -20,43 +20,25 @@
     <div class="order-scroll-container">
       <!-- 商店信息 -->
       <div class="shop-container">
-        <ShopInfo :shop="nearbyShops[0]" />
+        <ShopInfo />
       </div>
 
       <!-- 商品列表区域 - 使用flex布局，确保不被遮挡 -->
       <div class="product-container">
         <!-- 分类和商品列表都将在自身内部滚动 -->
-        <CategorySidebar
-          v-model="activeCategory"
-          :categories="categories"
-          class="category-sidebar"
-        />
-
-        <ProductList
-          :products="currentFoods"
-          @update-cart="updateCart"
-          class="product-list-component"
-        />
+        <CategorySidebar class="category-sidebar" />
+        <ProductList class="product-list-component" />
       </div>
     </div>
 
     <!-- 购物车浮动条 - 固定在视口底部 -->
     <div class="cart-wrapper">
-      <CartBar
-        :cart="cart"
-        :total-price="totalPrice"
-        @show-cart="showCart = true"
-        @submit="handleSubmitOrder"
-      />
+      <CartBar @click="store.showCart = !store.showCart" />
     </div>
 
     <!-- 购物车弹出层 -->
     <CartPopup
       :show="showCart"
-      @update:show="showCart = $event"
-      :cart-items="cart"
-      @update="updateCart"
-      @clear="clearCart"
     />
   </div>
 </template>
@@ -77,18 +59,8 @@ const router = useRouter()
 const store = useOrderStore()
 
 // 从 store 获取响应式状态
-const { 
-  activeCategory,
-  categories,
-  currentFoods,
-  cart,
-  nearbyShops,
-  totalPrice,
-  showCart
-} = storeToRefs(store)
-
-// 从 store 获取方法
-const { init, updateCart, clearCart, submitOrder } = store
+const { showCart } = storeToRefs(store)
+const { init, submitOrder } = store
 
 // 返回上一页
 const goBack = () => {
@@ -119,14 +91,15 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  clearCart()
+  // 确保使用store中的方法清空购物车
+  store.clearCart()
 })
 </script>
 
 <style scoped>
 /* 使用固定布局确保页面正确显示且防止横向滚动 */
 .order-page {
-  position: fixed;
+  position: absolute; /* 修改为absolute，避免fixed无法卸载 */
   top: 0;
   left: 0;
   right: 0;

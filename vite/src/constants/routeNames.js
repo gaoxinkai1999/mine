@@ -42,11 +42,6 @@ export const ROUTE_NAMES = {
   STATISTICS_CHART: 'statistics-chart',
   STATISTICS_SHOP: 'statistics-shop',
   
-  // 价格规则
-  PRICE_RULE_LIST: 'price-rule-list',
-  PRICE_RULE_DETAIL: 'price-rule-detail',
-  PRICE_RULE_CREATE: 'price-rule-create',
-  
   // 其他
   DEMO: 'demo'
 } 

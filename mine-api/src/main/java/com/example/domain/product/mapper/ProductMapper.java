@@ -1,7 +1,6 @@
 package com.example.domain.product.mapper;
 
 import com.example.domain.product.dto.ProductDto;
-import com.example.domain.product.dto.ProductSaleInfoDTO;
 import com.example.domain.product.dto.ProductUpdateDto;
 import com.example.domain.product.entity.Product;
 import com.example.domain.product.repository.CategoryRepository;
@@ -17,7 +16,7 @@ public abstract class ProductMapper {
     public abstract ProductDto toProductDto(Product product);
 
 
-    public abstract ProductSaleInfoDTO productDtotoProductSaleInfoDTO(ProductDto productDto);
+
 
     @Mapping(target = "category", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)

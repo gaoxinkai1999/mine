@@ -1,8 +1,8 @@
 <template>
   <div class="sidebar">
-    <van-sidebar v-model="activeIndex">
+    <van-sidebar v-model="store.activeCategory">
       <van-sidebar-item
-          v-for="category in categories"
+          v-for="category in store.categories"
           :key="category.id"
           :title="category.name"
       />
@@ -10,31 +10,10 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'CategorySidebar',
-  props: {
-    categories: {
-      type: Array,
-      required: true,
-      default: () => []
-    },
-    modelValue: {
-      type: Number,
-      default: 0
-    }
-  },
-  computed: {
-    activeIndex: {
-      get() {
-        return this.modelValue
-      },
-      set(value) {
-        this.$emit('update:modelValue', value)
-      }
-    }
-  }
-}
+<script setup>
+import { useOrderStore } from '@/stores/order'
+
+const store = useOrderStore()
 </script>
 
 <style scoped>

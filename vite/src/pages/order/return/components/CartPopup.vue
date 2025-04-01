@@ -4,7 +4,7 @@
     <div
         v-if="showCart"
         class="custom-overlay"
-        @click="showCart=false"
+        @click="closeCart"
     ></div>
 
     <!-- 购物车弹窗内容 -->
@@ -80,6 +80,10 @@ const clearCart = () => {
   store.clearCart()
 }
 
+const closeCart = () => {
+  showCart.value = false
+}
+
 const removeCartItem = (item) => {
   store.removeCartItem(item)
 }
@@ -95,17 +99,17 @@ const getReturnTypeTag = (type) => {
   height: 0;
   width: 100%;
   box-sizing: border-box;
-  z-index: 2000; /* 确保比App.vue中的元素更高 */
+  z-index: 2500; /* 提高z-index确保在页面元素之上 */
 }
 
 .custom-overlay {
-  position: fixed;
+  position: fixed; /* 改回fixed确保全屏覆盖 */
   top: 0;
   left: 0;
   right: 0;
-  bottom: 50px; /* 购物车栏的高度 */
-  background-color: rgba(0, 0, 0, 0.7);
-  z-index: 2500;
+  bottom: 50px; /* 留出底部购物车栏的高度 */
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2500; /* 确保遮罩层与弹出层同级 */
 }
 
 .cart-popup {

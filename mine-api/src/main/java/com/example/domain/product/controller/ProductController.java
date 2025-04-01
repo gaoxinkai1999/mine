@@ -1,7 +1,6 @@
 package com.example.domain.product.controller;
 
 import com.example.domain.product.dto.ProductDto;
-import com.example.domain.product.dto.ProductSaleInfoDTO;
 import com.example.domain.product.dto.ProductUpdateDto;
 import com.example.domain.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,34 +53,6 @@ public class ProductController {
     }
 
 
-
-
-    /**
-     * 获取店铺可售商品列表（包含库存信息）
-     *
-     * @param shopId 店铺ID
-     * @return 商品销售信息列表
-     */
-    @GetMapping("/sale-list")
-    @Operation(summary = "获取店铺可售商品列表（包含库存信息）", description = "获取店铺可售商品列表（包含库存信息）")
-    public List<ProductSaleInfoDTO> getProductSaleList(@RequestParam Integer shopId) {
-        return productService.getProductSaleList(shopId);
-    }
-
-    // /**
-    //  * 转换商品的批次管理状态
-    //  *
-    //  * @param request 批次转换请求
-    //  * @return 转换后的商品
-    //  */
-    // @PostMapping("/convertBatch")
-    // public Product convertBatch(@RequestBody ProductBatchConversionRequest request) {
-    //     if (request.isConvertToBatch()) {
-    //         return productService.convertToBatchProduct(request.getProductId());
-    //     } else {
-    //         return productService.convertToNonBatchProduct(request.getProductId());
-    //     }
-    // }
 
     /**
      * 批量更新产品信息

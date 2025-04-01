@@ -31,7 +31,6 @@ public class OrderQuery implements BaseQuery {
         public static final String SHOP = "shop";
         public static final String DETAILS = "details";
         public static final String PRODUCT = "details.product";
-        public static final String PRICE_RULE = "priceRule";
 
         // 常用组合
         public static Set<String> BASIC = Collections.emptySet();

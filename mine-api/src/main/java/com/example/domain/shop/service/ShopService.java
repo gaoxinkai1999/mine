@@ -1,8 +1,6 @@
 package com.example.domain.shop.service;
 
 
-import com.example.domain.price.entity.QPriceRule;
-import com.example.domain.price.entity.QPriceRuleDetail;
 import com.example.domain.product.entity.QProduct;
 import com.example.domain.shop.dto.ShopArrearsDto;
 import com.example.domain.shop.dto.ShopDto;
@@ -48,8 +46,6 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
 
     private final QShop shop = QShop.shop; // 查询商家的QueryDSL对象
 
-    private final QPriceRule priceRule = QPriceRule.priceRule; // 查询价格规则的QueryDSL对象
-    private final QPriceRuleDetail priceRuleDetail = QPriceRuleDetail.priceRuleDetail; // 查询价格规则详情的QueryDSL对象
     private final QProduct product = QProduct.product;
 
     public void update(List<ShopRequestDto> shops) {
@@ -145,24 +141,7 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
 
     @Override
     public void buildRelationship(ShopQuery query, JPAQuery<Shop> jpaQuery) {
-        // 处理关联
-        if (query.getIncludes()
-                 .contains(ShopQuery.Include.PRICE_RULE)) {
-            jpaQuery.leftJoin(shop.priceRule, priceRule)
-                    .fetchJoin();
-
-            // 处理关联
-            if (query.getIncludes()
-                     .contains(ShopQuery.Include.PRICE_RULE_DETAIL)) {
-                jpaQuery.leftJoin(priceRule.priceRuleDetails, priceRuleDetail)
-                        .fetchJoin();
-                if (query.getIncludes()
-                         .contains(ShopQuery.Include.PRODUCT)) {
-                    jpaQuery.leftJoin(priceRuleDetail.product, product)
-                            .fetchJoin();
-                }
-            }
-        }
+        // 已移除价格规则相关关联逻辑
     }
 
     /**

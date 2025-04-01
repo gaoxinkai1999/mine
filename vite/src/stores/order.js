@@ -127,9 +127,10 @@ export const useOrderStore = defineStore('order', () => {
      */
     async function getProducts() {
         try {
-            const products = await api.product.getProductSaleList({shopId:currentShop.value.id})
+            const products = await api.product.getProducts()
             foods.value = products.map(food => ({
                 ...food,
+                price: food.defaultSalePrice,
                 count: 0
             }))
         } catch (error) {
@@ -156,9 +157,8 @@ export const useOrderStore = defineStore('order', () => {
             cart.value.push({
                 id: item.id,
                 name: item.name,
-                price: item.price,
+                price: item.defaultSalePrice,
                 count: item.count,
-
             })
         }
 
@@ -196,7 +196,7 @@ export const useOrderStore = defineStore('order', () => {
                 items: cart.value.map(item => ({
                     productId: item.id,
                     quantity: item.count,
-                    price: item.price
+                    price: item.salePrice
                 })),
             }
 

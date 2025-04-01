@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -59,7 +58,6 @@ public class ShopController {
     public ShopDto getShop(@RequestParam Integer id) {
         ShopQuery build = ShopQuery.builder()
                                    .id(id)
-                                   .includes(Set.of(ShopQuery.Include.PRICE_RULE))
                                    .build();
         Shop shop = shopService.findOne(build)
                                .orElse(null);
@@ -75,7 +73,6 @@ public class ShopController {
 
         ShopQuery build = ShopQuery.builder()
                                    .isDel(false)
-                                   .includes(Set.of(ShopQuery.Include.PRICE_RULE))
                                    .build();
 
         List<Shop> shops = shopService.findList(build);
@@ -100,7 +97,6 @@ public class ShopController {
         // 1. 调用已有方法获取门店列表（假设 findShops 已实现）
         ShopQuery build = ShopQuery.builder()
                                    .isDel(false)
-                                   .includes(Set.of(ShopQuery.Include.PRICE_RULE))
                                    .build();
         List<Shop> shops = shopService.findList(build);
 
@@ -138,7 +134,6 @@ public class ShopController {
         ShopQuery build = ShopQuery.builder()
                                    .isDel(false)
                                    .name(name)
-                                   .includes(Set.of(ShopQuery.Include.PRICE_RULE))
                                    .build();
 
         List<Shop> shops = shopService.findList(build);

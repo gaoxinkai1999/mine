@@ -1,5 +1,6 @@
 <template>
   <div class="product-list">
+    <van-empty v-if="products.length === 0" description="没有找到商品"/>
     <van-card
         v-for="(item, index) in products"
         :key="index"

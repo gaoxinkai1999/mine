@@ -14,24 +14,6 @@
 
       <van-field v-model="shop.name" label="商家名" size="large"/>
 
-      <van-field
-          :value="shop.priceRule.name"
-          clickable
-          label="选择器"
-          name="picker"
-          placeholder="点击选择城市"
-          readonly
-          @click="showPicker = true"
-      />
-      <van-popup v-model="showPicker" position="bottom">
-        <van-picker
-            :columns="priceRules"
-            show-toolbar
-            value-key="name"
-            @cancel="showPicker = false"
-            @confirm="onConfirm"
-        />
-      </van-popup>
 
 
       <div style=" margin-top:3vh">
@@ -58,25 +40,13 @@ export default {
   name: "SetShop",
   data() {
     return {
-      shop: {},
-      showPicker: false,
-      priceRules: []
+      shop: {}
     }
   },
   mounted() {
     this.getShop()
-    this.getPriceRules()
   },
   methods: {
-    onConfirm(value) {
-      this.shop.priceRule = value
-      this.showPicker = false
-    },
-    getPriceRules() {
-      this.$http.post('/priceRule/findByIsDel', this.$qs.stringify({isDel: false})).then(res => {
-        this.priceRules = res.data
-      })
-    },
     async getShop() {
       this.shop = await api.shop.getShop({id: this.$route.query.id})
 

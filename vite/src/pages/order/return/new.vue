@@ -51,7 +51,7 @@
 
     <!-- 购物车弹出层 -->
     <CartPopup
-
+      :show="showCart"
     />
   </div>
 </template>
@@ -128,18 +128,18 @@ onBeforeUnmount(() => {
 <style scoped>
 /* 使用固定布局确保页面正确显示且防止横向滚动 */
 .return-order-page {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: #fff7ee; /* 退货系统使用浅橙色背景 */
+  background: #f8f8fa;
   display: flex;
   flex-direction: column;
   width: 100%;
   overflow: hidden;
   box-sizing: border-box;
-  z-index: 10; /* 确保新订单页面高于App.vue中的元素 */
+  z-index: 10; /* 确保退货页面高于App.vue中的元素 */
 }
 
 /* 可滚动区域 - 调整为flex布局 */

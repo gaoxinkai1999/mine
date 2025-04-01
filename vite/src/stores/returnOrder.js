@@ -131,7 +131,7 @@ export const useReturnOrderStore = defineStore('returnOrder', () => {
      */
     async function getProducts() {
         try {
-            const products = await api.product.getProductSaleList({shopId: currentShop.value.id})
+            const products = await api.product.getProducts()
             foods.value = products.map(food => ({
                 ...food,
                 count: 0

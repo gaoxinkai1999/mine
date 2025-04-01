@@ -28,25 +28,6 @@ name: "shop-create"
           name="位置"
           placeholder="点击地图选择位置"
       />
-      <van-field
-          :rules="[{ required: true, message: '请选择价格规则' }]"
-          v-model="shop.priceRule.name"
-          clickable
-          label="价格规则"
-          name="picker"
-          readonly
-          required
-          @click="showPicker = true"
-      />
-      <van-popup v-model:show="showPicker" position="bottom">
-        <van-picker
-            :columns="priceRules"
-            show-toolbar
-            @cancel="showPicker = false"
-            @confirm="onConfirm"
-            :columns-field-names="customFieldName"
-        />
-      </van-popup>
 
       <!-- 地图容器 -->
       <div class="map-container">
@@ -94,16 +75,10 @@ let geocoder = null
 const shop = ref({
   name: '',
   location: '',
-  priceRule: {name: ''},
   longitude: '',
   latitude: ''
 })
-const customFieldName = {
-  text: 'name',
-  value: 'id',
-};
 
-const priceRules = ref([])
 
 // 初始化地图
 const initMap = async () => {
@@ -236,22 +211,11 @@ const onSubmit = async () => {
   }
 }
 
-// 选择价格规则
-const onConfirm = ({ selectedOptions }) => {
-  showPicker.value = false
-  shop.value.priceRule = selectedOptions[0]
-}
-
-// 获取价格规则列表
-const findAllPriceRules = async () => {
-  priceRules.value = await api.pricerule.getSimplePriceRules()
-}
 
 const onClickLeft = () => router.back()
 
 onMounted(() => {
   initMap()
-  findAllPriceRules()
 })
 
 onUnmounted(() => {

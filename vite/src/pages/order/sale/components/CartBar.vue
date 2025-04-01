@@ -1,12 +1,12 @@
 <template>
   <div class="cart-bar">
-    <div class="cart-icon" :class="{'has-items': totalCount > 0}" @click="$emit('show-cart')">
+    <div class="cart-icon" :class="{'has-items': totalCount > 0}" >
       <van-icon name="shopping-cart-o" />
       <div v-if="totalCount > 0" class="cart-badge">{{totalCount}}</div>
     </div>
     
     <div class="cart-info">
-      <div v-if="totalCount > 0" class="total-price">¥ {{totalPrice.toFixed(2)}}</div>
+      <div v-if="totalCount > 0" class="total-price">¥ {{store.totalPrice.toFixed(2)}}</div>
       <div v-else class="cart-tip">未选购商品</div>
     </div>
     
@@ -14,7 +14,7 @@
       class="checkout-btn" 
       type="primary" 
       :disabled="totalCount === 0"
-      @click="$emit('submit')"
+      @click="store.submitOrder()"
     >
       去结算
     </van-button>
@@ -23,26 +23,14 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useOrderStore } from '@/stores/order';
+import {storeToRefs} from 'pinia';
 
-// 接收props
-const props = defineProps({
-  cart: {
-    type: Array,
-    default: () => []
-  },
-  totalPrice: {
-    type: Number,
-    default: 0
-  }
-});
+const store = useOrderStore();
 
-// 定义事件
-const emit = defineEmits(['show-cart', 'submit']);
 
-// 计算购物车商品总数
-const totalCount = computed(() => {
-  return props.cart.reduce((sum, item) => sum + item.count, 0);
-});
+const { totalCount } = storeToRefs(store)
+
 </script>
 
 <style scoped>

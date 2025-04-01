@@ -4,7 +4,9 @@
     <!-- 主视图区域 -->
     <div class="main-content" :class="{ 'has-tabbar': showTabbar }">
       <router-view v-slot="{ Component }">
-        <component :is="Component"/>
+        <transition name="fade" mode="out-in">
+          <component :is="Component"/>
+        </transition>
       </router-view>
     </div>
 
@@ -253,5 +255,16 @@ html, body {
     padding-bottom: env(safe-area-inset-bottom);
     height: calc(var(--van-tabbar-height) + env(safe-area-inset-bottom));
   }
+}
+
+/* 添加页面过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
