@@ -10,181 +10,34 @@
       <!-- 数据卡片组 -->
       <div class="stats-groups">
         <!-- 今日数据 -->
-        <div v-if="today" :class="{ 'expanded': expandedCard === 'today' }" class="stats-card"
-             @click="toggleCard('today')">
-          <div class="card-header">
-            <h3 class="card-title">今日数据</h3>
-            <span class="date-tag">{{ formatDate(new Date()) }}</span>
-          </div>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="orders-o"/>
-              <div class="stat-content">
-                <div class="stat-label">订单数</div>
-                <div class="stat-value">{{ formatNumber(today.orderCount) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="gold-coin-o"/>
-              <div class="stat-content">
-                <div class="stat-label">销售额</div>
-                <div class="stat-value">¥{{ today.totalSales }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="chart-trending-o"/>
-              <div class="stat-content">
-                <div class="stat-label">总利润</div>
-                <div class="stat-value">¥{{ formatMoney(today.totalProfit) }}</div>
-              </div>
-            </div>
-          </div>
-          <!-- 详细信息展开部分 -->
-          <div v-show="expandedCard === 'today'" class="details-section">
-            <div class="details-header">
-              <h4>商品销售详情</h4>
-              <div class="total-cost">总成本: ¥{{ formatMoney(today.totalCost) }}</div>
-            </div>
-            <div class="product-table">
-              <table>
-                <thead>
-                <tr>
-                  <th>商品名称</th>
-                  <th>销售数量</th>
-                  <th>销售额</th>
-                  <th>利润</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr v-for="product in today.productSalesInfoDTOS" :key="product.productId">
-                  <td>{{ product.productName }}</td>
-                  <td>{{ product.quantity }}</td>
-                  <td>¥{{ formatMoney(product.totalSales) }}</td>
-                  <td>¥{{ formatMoney(product.totalProfit) }}</td>
-                </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <StatsCard
+          v-if="today"
+          title="今日数据"
+          :tag="formatDate(new Date())"
+          :stats="today"
+          :expanded="expandedCard === 'today'"
+          @toggle-expand="toggleCard('today')"
+        />
 
         <!-- 昨日数据 -->
-        <div v-if="yesterday" :class="{ 'expanded': expandedCard === 'yesterday' }" class="stats-card"
-             @click="toggleCard('yesterday')">
-          <div class="card-header">
-            <h3 class="card-title">昨日数据</h3>
-            <span class="date-tag">{{ formatDate(getYesterday()) }}</span>
-          </div>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="orders-o"/>
-              <div class="stat-content">
-                <div class="stat-label">订单数</div>
-                <div class="stat-value">{{ formatNumber(yesterday.orderCount) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="gold-coin-o"/>
-              <div class="stat-content">
-                <div class="stat-label">销售额</div>
-                <div class="stat-value">¥{{ formatMoney(yesterday.totalSales) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="chart-trending-o"/>
-              <div class="stat-content">
-                <div class="stat-label">总利润</div>
-                <div class="stat-value">¥{{ formatMoney(yesterday.totalProfit) }}</div>
-              </div>
-            </div>
-          </div>
-          <!-- 详细信息展开部分 -->
-          <div v-show="expandedCard === 'yesterday'" class="details-section">
-            <div class="details-header">
-              <h4>商品销售详情</h4>
-              <div class="total-cost">总成本: ¥{{ formatMoney(yesterday.totalCost) }}</div>
-            </div>
-            <div class="product-table">
-              <table>
-                <thead>
-                <tr>
-                  <th>商品名称</th>
-                  <th>销售数量</th>
-                  <th>销售额</th>
-                  <th>利润</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr v-for="product in yesterday.productSalesInfoDTOS" :key="product.productId">
-                  <td>{{ product.productName }}</td>
-                  <td>{{ product.quantity }}</td>
-                  <td>¥{{ formatMoney(product.totalSales) }}</td>
-                  <td>¥{{ formatMoney(product.totalProfit) }}</td>
-                </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <StatsCard
+          v-if="yesterday"
+          title="昨日数据"
+          :tag="formatDate(getYesterday())"
+          :stats="yesterday"
+          :expanded="expandedCard === 'yesterday'"
+          @toggle-expand="toggleCard('yesterday')"
+        />
 
         <!-- 当月数据 -->
-        <div v-if="thisMonth" :class="{ 'expanded': expandedCard === 'month' }" class="stats-card"
-             @click="toggleCard('month')">
-          <div class="card-header">
-            <h3 class="card-title">当月数据</h3>
-            <span class="date-tag">{{ getCurrentMonth() }}</span>
-          </div>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="orders-o"/>
-              <div class="stat-content">
-                <div class="stat-label">订单数</div>
-                <div class="stat-value">{{ formatNumber(thisMonth.orderCount) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="gold-coin-o"/>
-              <div class="stat-content">
-                <div class="stat-label">销售额</div>
-                <div class="stat-value">¥{{ formatMoney(thisMonth.totalSales) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="chart-trending-o"/>
-              <div class="stat-content">
-                <div class="stat-label">总利润</div>
-                <div class="stat-value">¥{{ formatMoney(thisMonth.totalProfit) }}</div>
-              </div>
-            </div>
-          </div>
-          <!-- 详细信息展开部分 -->
-          <div v-show="expandedCard === 'month'" class="details-section">
-            <div class="details-header">
-              <h4>商品销售详情</h4>
-              <div class="total-cost">总成本: ¥{{ formatMoney(thisMonth.totalCost) }}</div>
-            </div>
-            <div class="product-table">
-              <table>
-                <thead>
-                <tr>
-                  <th>商品名称</th>
-                  <th>销售数量</th>
-                  <th>销售额</th>
-                  <th>利润</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr v-for="product in thisMonth.productSalesInfoDTOS" :key="product.productId">
-                  <td>{{ product.productName }}</td>
-                  <td>{{ product.quantity }}</td>
-                  <td>¥{{ formatMoney(product.totalSales) }}</td>
-                  <td>¥{{ formatMoney(product.totalProfit) }}</td>
-                </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <StatsCard
+          v-if="thisMonth"
+          title="当月数据"
+          :tag="getCurrentMonth()"
+          :stats="thisMonth"
+          :expanded="expandedCard === 'month'"
+          @toggle-expand="toggleCard('month')"
+        />
       </div>
     </div>
   </van-pull-refresh>
@@ -193,9 +46,13 @@
 <script>
 import api from "@/api/index.js";
 import {showToast} from "vant";
+import StatsCard from "@/components/StatsCard.vue";
 
 export default {
   name: "MyMine",
+  components: {
+    StatsCard
+  },
   data() {
     return {
       today: null,
@@ -252,12 +109,6 @@ export default {
       return new Intl.NumberFormat().format(num);
     },
 
-    formatMoney(amount) {
-      return new Intl.NumberFormat('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(amount);
-    },
 
     formatDate(date) {
       return new Intl.DateTimeFormat('zh-CN', {

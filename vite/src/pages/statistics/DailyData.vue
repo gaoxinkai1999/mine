@@ -16,68 +16,15 @@
       <div class="stats-cards">
         <van-empty v-if="!tableData || Object.keys(tableData).length === 0" description="暂无数据" />
         
-        <div v-else v-for="(data, date) in sortedTableData" :key="date" 
-             :class="{ 'expanded': expandedCard === date }" 
-             class="stats-card" 
-             @click="toggleCard(date)">
-          <div class="card-header">
-            <h3 class="card-title">{{ formatDateDisplay(date) }}</h3>
-            <span class="date-tag">{{ formatDate(new Date(date)) }}</span>
-          </div>
-          
-          <div class="stats-grid">
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="orders-o"/>
-              <div class="stat-content">
-                <div class="stat-label">订单数</div>
-                <div class="stat-value">{{ formatNumber(data.orderCount) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="gold-coin-o"/>
-              <div class="stat-content">
-                <div class="stat-label">销售额</div>
-                <div class="stat-value">¥{{ formatMoney(data.totalSales) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="chart-trending-o"/>
-              <div class="stat-content">
-                <div class="stat-label">总利润</div>
-                <div class="stat-value">¥{{ formatMoney(data.totalProfit) }}</div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 详细信息展开部分 -->
-          <div v-show="expandedCard === date" class="details-section">
-            <div class="details-header">
-              <h4>商品销售详情</h4>
-              <div class="total-cost">总成本: ¥{{ formatMoney(data.totalCost) }}</div>
-            </div>
-            <div class="product-table">
-              <table v-if="data.productSalesInfoDTOS && data.productSalesInfoDTOS.length > 0">
-                <thead>
-                <tr>
-                  <th>商品名称</th>
-                  <th>销售数量</th>
-                  <th>销售额</th>
-                  <th>利润</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr v-for="product in data.productSalesInfoDTOS" :key="product.productId">
-                  <td>{{ product.productName }}</td>
-                  <td>{{ product.quantity }}</td>
-                  <td>¥{{ formatMoney(product.totalSales) }}</td>
-                  <td>¥{{ formatMoney(product.totalProfit) }}</td>
-                </tr>
-                </tbody>
-              </table>
-              <van-empty v-else description="暂无商品销售数据" />
-            </div>
-          </div>
-        </div>
+        <StatsCard
+          v-for="(data, date) in sortedTableData"
+          :key="date"
+          :title="formatDateDisplay(date)"
+          :tag="formatDate(new Date(date))"
+          :stats="data"
+          :expanded="expandedCard === date"
+          @toggle-expand="toggleCard(date)"
+        />
       </div>
     </div>
   </van-pull-refresh>
@@ -86,9 +33,13 @@
 <script>
 import api from "@/api/index.js";
 import { showToast } from "vant";
+import StatsCard from "@/components/StatsCard.vue";
 
 export default {
   name: "DailyData",
+  components: {
+    StatsCard
+  },
   data() {
     return {
       tableData: [],
@@ -139,12 +90,6 @@ export default {
     },
     formatNumber(num) {
       return new Intl.NumberFormat().format(num || 0);
-    },
-    formatMoney(amount) {
-      return new Intl.NumberFormat('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(amount || 0);
     },
     toggleCard(date) {
       if (this.expandedCard === date) {

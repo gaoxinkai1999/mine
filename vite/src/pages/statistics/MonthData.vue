@@ -16,70 +16,16 @@
       <div class="stats-cards">
         <van-empty v-if="!tableData || tableData.length === 0" description="暂无数据" />
         
-        <div v-else v-for="(data, index) in tableData" :key="index" 
-             :class="{ 'expanded': expandedCard === index }" 
-             class="stats-card" 
-             @click="toggleCard(index)">
-          <div class="card-header">
-            <h3 class="card-title">{{ data.monthName }}</h3>
-            <span :class="['growth-tag', getGrowthClass(data.growthRate)]">
-              {{ data.growthRate > 0 ? '+' : '' }}{{ (data.growthRate * 100).toFixed(2) }}%
-            </span>
-          </div>
-          
-          <div class="stats-grid">
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="orders-o"/>
-              <div class="stat-content">
-                <div class="stat-label">订单数</div>
-                <div class="stat-value">{{ formatNumber(data.orderCount) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="gold-coin-o"/>
-              <div class="stat-content">
-                <div class="stat-label">销售额</div>
-                <div class="stat-value">¥{{ formatMoney(data.totalSales) }}</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <van-icon class="stat-icon" name="chart-trending-o"/>
-              <div class="stat-content">
-                <div class="stat-label">总利润</div>
-                <div class="stat-value">¥{{ formatMoney(data.totalProfit) }}</div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 详细信息展开部分 -->
-          <div v-show="expandedCard === index" class="details-section">
-            <div class="details-header">
-              <h4>商品销售详情</h4>
-              <div class="total-cost">总成本: ¥{{ formatMoney(data.totalCost) }}</div>
-            </div>
-            <div class="product-table">
-              <table v-if="data.productSalesInfoDTOS && data.productSalesInfoDTOS.length > 0">
-                <thead>
-                <tr>
-                  <th>商品名称</th>
-                  <th>销售数量</th>
-                  <th>销售额</th>
-                  <th>利润</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr v-for="product in data.productSalesInfoDTOS" :key="product.productId">
-                  <td>{{ product.productName }}</td>
-                  <td>{{ product.quantity }}</td>
-                  <td>¥{{ formatMoney(product.totalSales) }}</td>
-                  <td>¥{{ formatMoney(product.totalProfit) }}</td>
-                </tr>
-                </tbody>
-              </table>
-              <van-empty v-else description="暂无商品销售数据" />
-            </div>
-          </div>
-        </div>
+        <StatsCard
+          v-for="(data, index) in tableData"
+          :key="index"
+          :title="data.monthName"
+          :tag="(data.growthRate > 0 ? '+' : '') + (data.growthRate * 100).toFixed(2) + '%'"
+          :tag-class="getGrowthClass(data.growthRate)"
+          :stats="data"
+          :expanded="expandedCard === index"
+          @toggle-expand="toggleCard(index)"
+        />
       </div>
     </div>
   </van-pull-refresh>
@@ -88,9 +34,13 @@
 <script>
 import api from "@/api/index.js";
 import { showToast } from "vant";
+import StatsCard from "@/components/StatsCard.vue";
 
 export default {
   name: "MonthData",
+  components: {
+    StatsCard
+  },
   data() {
     return {
       tableData: [],
@@ -113,21 +63,20 @@ export default {
       if (growth < 0) return 'growth-negative';
       return 'growth-neutral';
     },
+    formatNumber(num) {
+      return new Intl.NumberFormat().format(num || 0);
+    },
     formatDate(date) {
+      // Ensure date is a valid Date object before formatting
+      if (!(date instanceof Date) || isNaN(date)) {
+        console.warn('Invalid date passed to formatDate:', date);
+        return ''; // Return empty string for invalid dates
+      }
       return date.toLocaleDateString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
       }).replace(/\//g, '-');
-    },
-    formatNumber(num) {
-      return new Intl.NumberFormat().format(num || 0);
-    },
-    formatMoney(amount) {
-      return new Intl.NumberFormat('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(amount || 0);
     },
     toggleCard(index) {
       if (this.expandedCard === index) {
