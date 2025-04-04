@@ -62,7 +62,7 @@ export function useAppUpdate() {
   async function fetchVersionInfo() {
     try {
       // 示例：使用时间戳防止缓存版本信息
-      const url = `http://update.abocidee.com/updates/version.json?t=${Date.now()}`;
+      const url = `https://cdn.abocidee.com/version.json`;
       const response = await fetch(url);
       return await response.json();
     } catch (error) {
@@ -192,18 +192,6 @@ export function useAppUpdate() {
     }
   }
 
-  /**
-   * 辅助方法：将 ArrayBuffer 转换为 Base64
-   */
-  function arrayBufferToBase64(buffer) {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
 
   return {
     isChecking,

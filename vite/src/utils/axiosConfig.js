@@ -4,9 +4,9 @@ import {showFailToast} from 'vant'; // 替换成你实际使用的 Toast 组件
 
 // 创建 axios 实例
 const instance = axios.create({
-    // baseURL: 'https://new.abocidee.com/api',
-    baseURL: 'http://192.168.0.102:8085/api',// 替换为你的后端 API 根路径
-    timeout: 50000, // 请求超时时间
+    baseURL: 'https://new.abocidee.com/api',
+    // baseURL: 'http://192.168.0.102:8085/api',// 替换为你的后端 API 根路径
+    timeout: 5000, // 请求超时时间
 });
 
 

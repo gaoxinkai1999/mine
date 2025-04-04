@@ -196,7 +196,7 @@ export const useOrderStore = defineStore('order', () => {
                 items: cart.value.map(item => ({
                     productId: item.id,
                     quantity: item.count,
-                    price: item.salePrice
+                    price: item.price
                 })),
             }
 

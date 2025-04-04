@@ -106,7 +106,7 @@ vite/android/.gradle/
 vite/android/gradle/wrapper/gradle-wrapper.jar
 
 # 安卓APK和Bundle文件
-
+*.apk
 *.aab
 *.ap_
 *.aar
