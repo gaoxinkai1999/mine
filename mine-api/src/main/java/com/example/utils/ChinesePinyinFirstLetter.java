@@ -5,7 +5,7 @@ import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType;
 import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
 import net.sourceforge.pinyin4j.format.HanyuPinyinToneType;
 import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
-import org.junit.jupiter.api.Test;
+
 
 
 public class ChinesePinyinFirstLetter {
@@ -39,10 +39,5 @@ public class ChinesePinyinFirstLetter {
         // 非中文且非字母时返回空字符（或可调整为默认值）
         return '\0';
     }
-    @Test
-    public  void testGetFirstLetterOfFirstCharacter() {
-        String chineseString = "xxx";
-        char firstLetter = getFirstLetterOfFirstCharacter(chineseString);
-        System.out.println("The first letter of the first character in '" + chineseString + "' is: " + firstLetter);
-    }
+
 }

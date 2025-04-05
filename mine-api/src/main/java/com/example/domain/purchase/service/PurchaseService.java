@@ -26,7 +26,9 @@ import com.example.query.PurchaseQuery;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -306,15 +308,15 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
      */
     public Map<Integer, Map<String, Integer>> calculatePurchaseQuantity(int[] productIds) {
         Map<Integer, Map<String, Integer>> productIdQuantityMap = new HashMap<>();
-        int forecastHorizonDays = 30; // 预测未来多少天
-        int warningStockDays = 5;    // 预警库存覆盖的天数
+        int forecastHorizonDays = 4; // 预测未来多少天
+        int warningStockDays = 1;    // 预警库存覆盖的天数
 
         // 1. 获取足够长的历史销售数据 (例如过去 1 年 + 预测期，以便季节性模型有足够数据)
         //    注意：具体需要多长的数据取决于最复杂模型的需求 (HoltWintersSeasonal 需要至少 1 年)
         //    这里获取稍长一些的数据以备优化和初始化使用
         LocalDate endDate = LocalDate.now()
                                      .minusDays(1);
-        LocalDate startDate = endDate.minusDays(120); // 获取约1年多的数据
+        LocalDate startDate = endDate.minusDays(230); // 获取约1年多的数据
         log.info("开始计算采购数量，获取历史数据范围: {} 到 {}", startDate, endDate);
         Map<LocalDate, SalesStatisticsDTO> historicalDataMap = statisticsService.calculateDailyStatistics(startDate, endDate);
         log.info("获取到 {} 天的历史销售统计数据。", historicalDataMap.size());
@@ -324,17 +326,16 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
         Arrays.stream(productIds)
               // 可以考虑并行处理以提高效率
               .forEach(productId -> {
-                  double totalForecastQuantity = 0;
+                  double totalForecastQuantity =0;
                   try {
-                      log.info("商品ID: {} 开始预测未来 {} 天销量...", productId, forecastHorizonDays);
+                      log.info("商品ID: {} 开始预测未来 {} 周销量...", productId, forecastHorizonDays);
                       // 调用重构后的 ForecastService 方法
-                      totalForecastQuantity = forecastService.forecastProductTotal(productId, historicalDataMap, forecastHorizonDays);
-                      log.info("商品ID: {} 预测未来 {} 天总销量: {}", productId, forecastHorizonDays, totalForecastQuantity);
+                      double[] forecast = forecastService.forecastProductTotal(productId, historicalDataMap, forecastHorizonDays);
+                      totalForecastQuantity = Arrays.stream(forecast).sum();
+                      log.info("商品ID: {} 预测未来 {} 周总销量: {}", productId, forecastHorizonDays, totalForecastQuantity);
 
-                      // 计算预警库存 (基于预测的日均销量)
-                      double averageDailyForecast = (forecastHorizonDays > 0) ? totalForecastQuantity / forecastHorizonDays : 0;
-                      double warningStock = averageDailyForecast * warningStockDays;
-
+                      double warningStock = forecast[0] ;
+                      log.info("商品ID: {} 预警库存: {}", productId, warningStock);
                       // 存储结果 (确保为整数)
                       productIdQuantityMap.put(productId, Map.of(
                               "forecastQuantity", (int) Math.round(totalForecastQuantity),
@@ -430,5 +431,85 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
         private Integer purchaseDetailId; // 采购明细ID
         private LocalDate productionDate; // 生产日期
         private LocalDate expirationDate; // 过期日期
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class ProductBudgetInfo {
+        private int productId;
+        private BigDecimal unitPrice;
+        private int currentStock;
+        private String productName;
+
+    }
+
+    /**
+     * 根据总预算和各商品的预测销量及库存情况，智能分配预算，计算每个商品的建议采购数量。
+     * <p>
+     * 核心逻辑：
+     * 1. 获取较长时间范围内的历史销售数据，供预测模型使用。
+     * 2. 对每个商品进行未来若干天（默认4天）的销量预测。
+     * 3. 结合当前库存，计算每个商品的“缺口销量” = max(预测总销量 - 当前库存, 0)，表示建议补货的数量。
+     * 4. 统计所有商品的缺口销量总和，计算每个商品的缺口权重 = 该商品缺口 / 总缺口。
+     * 5. 按照权重，将总预算拆分分配给各商品，预算越多表示该商品越紧缺。
+     * 6. 根据每个商品的单价，将分配的预算转化为采购数量，向下取整保证不超预算。
+     * 7. 返回每个商品对应的采购数量，预算尽量用完，库存充足或预测销量低的商品可能为0。
+     *
+     * @param totalBudget 总采购预算金额，单位：元
+     * @param productInfoList 商品信息列表，包含商品ID、单价、当前库存、商品名称等
+     * @return 商品ID与建议采购数量的映射关系，key为商品ID，value为采购数量（整数，可能为0）
+     */
+    public Map<Integer, Integer> allocateBudgetForProducts(BigDecimal totalBudget, List<ProductBudgetInfo> productInfoList) {
+        // 最终结果：每个商品的建议采购数量
+        Map<Integer, Integer> result = new HashMap<>();
+
+        // 预测未来几天的销量，默认4天
+        int forecastDays = 4;
+        // 计算历史销售数据的时间范围
+        LocalDate endDate = LocalDate.now().minusDays(1);
+        LocalDate startDate = endDate.minusDays(230);
+        // 获取历史销售数据，供预测模型使用
+        Map<LocalDate, SalesStatisticsDTO> historicalDataMap = statisticsService.calculateDailyStatistics(startDate, endDate);
+
+        // 存储每个商品的缺口销量
+        Map<Integer, Double> productGapMap = new HashMap<>();
+        // 所有商品的缺口销量总和
+        double totalGap = 0.0;
+
+        // 遍历每个商品，预测销量并计算缺口
+        for (ProductBudgetInfo info : productInfoList) {
+            try {
+                // 调用预测服务，预测未来forecastDays天的销量
+                double[] forecast = forecastService.forecastProductTotal(info.getProductId(), historicalDataMap, forecastDays);
+                // 计算预测期内的总销量
+                double forecastSum = Arrays.stream(forecast).sum();
+                // 计算缺口销量 = max(预测销量 - 当前库存, 0)，避免负值
+                double gap = Math.max(forecastSum - info.getCurrentStock(), 0);
+                productGapMap.put(info.getProductId(), gap);
+                totalGap += gap;
+            } catch (Exception e) {
+                // 预测失败时，缺口视为0
+                productGapMap.put(info.getProductId(), 0.0);
+            }
+        }
+
+        // 根据缺口销量占比，分配预算并计算采购数量
+        for (ProductBudgetInfo info : productInfoList) {
+            double gap = productGapMap.getOrDefault(info.getProductId(), 0.0);
+            if (gap <= 0 || totalGap == 0) {
+                // 缺口为0或总缺口为0时，不分配预算
+                result.put(info.getProductId(), 0);
+                continue;
+            }
+            // 当前商品分配的预算 = 总预算 * 缺口占比
+            BigDecimal productBudget = totalBudget.multiply(BigDecimal.valueOf(gap / totalGap));
+            // 采购数量 = 预算 / 单价，向下取整避免超预算
+            int quantity = productBudget.divide(info.getUnitPrice(), 0, BigDecimal.ROUND_DOWN).intValue();
+            result.put(info.getProductId(), quantity);
+        }
+
+        // 返回每个商品的采购数量
+        return result;
     }
 }

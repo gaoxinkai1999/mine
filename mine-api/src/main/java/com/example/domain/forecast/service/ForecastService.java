@@ -1,16 +1,15 @@
 package com.example.domain.forecast.service;
 
 import com.example.domain.forecast.strategy.ForecastStrategy;
-import com.example.domain.product.service.ProductService; // 确保已导入
-import com.example.domain.statistics.dto.response.ProductSalesInfoDTO; // 确保已导入
-import com.example.domain.statistics.dto.response.SalesStatisticsDTO; // 确保已导入
+import com.example.domain.product.service.ProductService;
+import com.example.domain.statistics.dto.response.ProductSalesInfoDTO;
+import com.example.domain.statistics.dto.response.SalesStatisticsDTO;
 import com.example.exception.MyException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -57,80 +56,32 @@ public class ForecastService {
      * @return 预测的未来 N 天总销量。如果无法预测（如无历史数据），则返回 0。
      * @throws MyException 如果在预测过程中发生不可恢复的错误。
      */
-    public double forecastProductTotal(int productId, Map<LocalDate, SalesStatisticsDTO> historicalDataMap, int forecastDays) throws MyException {
+    public double[] forecastProductTotal(int productId, Map<LocalDate, SalesStatisticsDTO> historicalDataMap, int forecastDays) throws MyException {
         // 1. 提取该商品的原始日销量数据
         double[] rawDailySales = getProductData(historicalDataMap, productId);
         log.debug("商品ID: {}, 原始数据长度: {}", productId, rawDailySales.length);
 
-        if (rawDailySales.length == 0) {
-            log.warn("商品ID: {} 历史数据为空，无法预测。", productId);
-            return 0.0; // 对于无历史数据的商品，预测销量为0
-        }
+        double[] weeklyData = aggregateToWeeklyData(rawDailySales);
 
-        // 2. 数据预处理 (例如：7日移动平均平滑) - 可选步骤
-        // 如果需要，在此处调用 applyDataPreprocessing
-        double[] processedData = applyDataPreprocessing(rawDailySales);
-        log.debug("商品ID: {}, 处理后数据长度: {}", productId, processedData.length);
-
-        // 3. 选择合适的预测策略 (已排序，取第一个满足条件的)
         ForecastStrategy selectedStrategy = strategies.stream()
-                                                      .filter(strategy -> strategy.canHandle(processedData.length))
-                                                      .findFirst()
-                                                      // 使用 orElse(null) 或 Optional 处理找不到策略的情况
-                                                      .orElse(null);
-
-        // 如果没有找到合适的策略（例如数据量 < 30），则不进行预测
-        if (selectedStrategy == null) {
-            log.warn("商品ID: {} 数据量 ({}) 过少，没有适用的预测策略。", productId, processedData.length);
-            throw new MyException("商品ID: " + productId + " 没有找到适合数据量 " + processedData.length + " 的预测策略");
-        }
-
-        log.info("商品ID: {}, 数据长度: {}, 选择策略: {}", productId, processedData.length, selectedStrategy.getStrategyName());
+                                                    .filter(strategy -> strategy.canHandle(weeklyData.length))
+                                                    .findFirst()
+                                                    .orElseThrow(() -> new MyException("没有可用的预测策略"));
 
         // 4. 执行预测
         double[] dailyForecast;
         try {
-            dailyForecast = selectedStrategy.forecast(processedData, forecastDays);
+            dailyForecast = selectedStrategy.forecast(weeklyData, forecastDays);
         } catch (Exception e) {
             log.error("商品ID: {} 使用策略 {} 预测失败: {}", productId, selectedStrategy.getStrategyName(), e.getMessage(), e);
-            // 预测失败时，可以选择返回 0 或重新抛出异常，这里选择返回 0 并记录错误
-            // throw new MyException("商品ID: " + productId + " 预测失败", e);
-            log.warn("商品ID: {} 预测失败，将返回预测值 0。", productId);
-            return 0.0;
+
+            return new double[]{0.0};
         }
 
-        // 5. 计算并返回总预测量
-        double totalForecast = Arrays.stream(dailyForecast)
-                                     .sum();
-        log.debug("商品ID: {}, 预测未来 {} 天总销量: {}", productId, forecastDays, totalForecast);
-
-        // 确保预测结果非负
-        return Math.max(0, totalForecast);
+        return dailyForecast;
     }
 
-    /**
-     * 数据预处理：应用7日移动平均 (示例)。
-     * 可以根据需要启用或修改此方法。
-     *
-     * @param rawData 原始日销量数据。
-     * @return 处理后的数据。
-     */
-    private double[] applyDataPreprocessing(double[] rawData) {
-        // 当前设计中，预处理逻辑（如移动平均）已包含在部分策略或 HoltWintersForecast 工具类中
-        // 此处可以选择是否进行额外的、通用的预处理
-        // 例如，如果所有策略都需要7日移动平均，可以在这里统一处理：
-        // int movingAverageWindow = 7;
-        // if (rawData.length >= movingAverageWindow) {
-        //     log.debug("应用 {} 日移动平均进行预处理...", movingAverageWindow);
-        //     return HoltWintersForecast.applySimpleMovingAverage(rawData, movingAverageWindow);
-        // } else {
-        //     log.debug("数据量不足，跳过移动平均预处理。");
-        //     return rawData;
-        // }
-        // 暂时不进行通用预处理，让策略自行决定或使用原始数据
-        log.debug("数据预处理步骤：暂未应用通用平滑处理。");
-        return rawData;
-    }
+
 
     /**
      * 从按日期组织的销售统计数据中提取指定商品的日销量数组。
@@ -173,18 +124,7 @@ public class ForecastService {
         return dailySales;
     }
 
-    // --- 移除旧的 forecast 和 aggregateToWeeklyData 方法 ---
-    /*
-    public double forecast(double[] data, int forecastDays) throws MyException {
-        // ... 旧的实现 ...
-    }
 
-    public double[] aggregateToWeeklyData(double[] data) {
-        // ... 旧的实现 ...
-    }
-    */
-
-    // --- 保留可能仍然需要的其他公共方法，例如 getOverallSalesData ---
 
     /**
      * 提取总体销售额数据数组 (示例，如果其他地方需要)。
@@ -201,5 +141,30 @@ public class ForecastService {
                                               .getTotalSales()
                                               .doubleValue())
                    .toArray();
+    }
+
+    /**
+     * 将日销售数据聚合为周销售数据。
+     * 如果天数不是7的整数倍，则从开头舍弃多余的天数。
+     * 例如，10天数据会舍弃前3天，只聚合最后7天为1周。
+     *
+     * @param data 原始日销售数据
+     * @return 按周聚合的销售数据
+     */
+    public double[] aggregateToWeeklyData(double[] data) {
+        if (data == null || data.length < 7) {
+            return new double[0];
+        }
+        int remainder = data.length % 7;
+        int weeks = (data.length - remainder) / 7;
+        double[] weeklyData = new double[weeks];
+        for (int i = 0; i < weeks; i++) {
+            double sum = 0;
+            for (int j = 0; j < 7; j++) {
+                sum += data[remainder + i * 7 + j];
+            }
+            weeklyData[i] = sum;
+        }
+        return weeklyData;
     }
 }
