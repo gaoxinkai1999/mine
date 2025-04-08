@@ -45,7 +45,7 @@ import { useAppUpdate } from '@/utils/update.js';
 
 const { checkForUpdates } = useAppUpdate();
 
-const apkUrl = 'http://update.abocidee.com/updates/app-release.apk'; // 真实的 APK 下载地址
+
 
 checkForUpdates()
 

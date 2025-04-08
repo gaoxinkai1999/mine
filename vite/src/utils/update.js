@@ -41,7 +41,8 @@ export function useAppUpdate() {
       // 下载并安装APK
       if (versionInfo.apkUrl) {
         console.log('需要下载APK更新');
-        await downloadAndInstallApk(versionInfo.apkUrl);
+        const apkUrlWithTs = `${versionInfo.apkUrl}?t=${Date.now()}`;
+        await downloadAndInstallApk(apkUrlWithTs);
         return true;
       } else {
         console.log('没有可用的APK下载链接');
@@ -62,8 +63,8 @@ export function useAppUpdate() {
   async function fetchVersionInfo() {
     try {
       // 示例：使用时间戳防止缓存版本信息
-      const url = `https://cdn.abocidee.com/version.json`;
-      const response = await fetch(url);
+      const url = `https://cdn.abocidee.com/version.json?t=${Date.now()}`;
+      const response = await fetch(url, { cache: 'no-store' });
       return await response.json();
     } catch (error) {
       console.error('获取版本信息失败:', error);
