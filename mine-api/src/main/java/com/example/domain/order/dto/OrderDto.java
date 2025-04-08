@@ -59,7 +59,7 @@ public class OrderDto implements Serializable {
 
         private BigDecimal costPrice;
         private BigDecimal salePrice;
-        private boolean isDefaultPrice;
+        private boolean defaultPrice;
 
         /**
          * DTO for {@link Product}

@@ -49,6 +49,7 @@ public class ProductController {
     @PostMapping("/createProduct")
     @Operation(summary = "新建商品", description = "新建商品")
     public void createProduct(@RequestBody ProductDto productDto) {
+        // log.info("创建商品: {}", productDto);
         productService.createProduct(productDto);
     }
 

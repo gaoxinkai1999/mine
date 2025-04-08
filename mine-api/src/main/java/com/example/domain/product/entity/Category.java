@@ -38,6 +38,6 @@ public class Category implements Serializable {
     @NotNull
     @ColumnDefault("0")
     @Column(name = "is_del", nullable = false)
-    private boolean isDel;
+    private boolean del;
 
 }

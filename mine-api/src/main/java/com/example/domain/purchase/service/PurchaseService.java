@@ -214,6 +214,7 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
      */
     @Transactional
     public void cancelPurchaseOrder(Integer purchaseId) {
+
         // 1. 查找订单
         Purchase purchase = purchaseRepository.findById(purchaseId)
                                               .orElseThrow(() -> new MyException("采购单不存在: " + purchaseId));
@@ -288,7 +289,7 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
                                                                            productWithPurchaseInfoDto.setWarningQuantity(v.get("warningQuantity"));
                                                                            productWithPurchaseInfoDto.setRecommendPurchaseQuantity(v.get("forecastQuantity") - productWithPurchaseInfoDto.getCurrentStock());
                                                                        },
-                                                                       () -> productWithPurchaseInfoDto.setIsForecastNormal(false)
+                                                                       () -> productWithPurchaseInfoDto.setForecastNormal(false)
                                                                );
 
 

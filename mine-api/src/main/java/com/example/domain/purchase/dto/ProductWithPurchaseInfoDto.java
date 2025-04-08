@@ -23,7 +23,7 @@ public class ProductWithPurchaseInfoDto {
     private Integer recommendPurchaseQuantity;
 
     // 是否正常预测
-    private Boolean isForecastNormal = true;
+    private Boolean forecastNormal = true;
 
 
 }

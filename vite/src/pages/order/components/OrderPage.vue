@@ -18,7 +18,7 @@
       >
         <template v-if="shop.id!==undefined" #input>
         <span> {{ shop.location ? `(${shop.location})` : '' }}{{ shop.name }}
-           <van-tag v-if="shop.isDel" type="danger">弃用</van-tag>
+           <van-tag v-if="shop.del" type="danger">弃用</van-tag>
         </span>
         </template>
       </van-field>

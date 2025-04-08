@@ -83,8 +83,8 @@ public class CategoryService implements BaseRepository<Category, CategoryQuery> 
         }
 
         // 根据是否删除查询
-        if (query.getIsDel() != null) {
-            where.and(qCategory.isDel.eq(query.getIsDel()));
+        if (query.getDel() != null) {
+            where.and(qCategory.del.eq(query.getDel()));
         }
 
         // 返回查询对象，按照排序字段排序

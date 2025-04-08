@@ -7,5 +7,5 @@ public class CategoryUpdateDto {
     private Integer id;
     private String name;
     private Integer sort;
-    private Boolean isDel;
+    private Boolean del;
 } 

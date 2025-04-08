@@ -17,7 +17,7 @@ public class ShopQuery implements BaseQuery {
     private String name;
 
     private Character pinyin;
-    private Boolean isDel;
+    private Boolean del;
     private Boolean slow;
     private Boolean location;
     private Boolean havaArrears;

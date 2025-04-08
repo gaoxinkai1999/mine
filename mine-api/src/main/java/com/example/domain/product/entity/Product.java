@@ -35,7 +35,7 @@ public class Product {
 
     @ToString.Include
     @Column(name = "is_del")
-    private boolean isDel;
+    private boolean del;
     // 商品类别（双向关联）
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
@@ -48,5 +48,5 @@ public class Product {
     private int sort;
 
     @Column(name = "is_batch_managed", nullable = false)
-    private boolean isBatchManaged = false;
+    private boolean batchManaged = false;
 }

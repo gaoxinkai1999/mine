@@ -72,7 +72,7 @@ public class ShopController {
     public List<ShopSimpleDto> getShops() {
 
         ShopQuery build = ShopQuery.builder()
-                                   .isDel(false)
+                                   .del(false)
                                    .build();
 
         List<Shop> shops = shopService.findList(build);
@@ -96,7 +96,7 @@ public class ShopController {
     public Map<Character, List<ShopSimpleDto>> groupShopsByPinyin() {
         // 1. 调用已有方法获取门店列表（假设 findShops 已实现）
         ShopQuery build = ShopQuery.builder()
-                                   .isDel(false)
+                                   .del(false)
                                    .build();
         List<Shop> shops = shopService.findList(build);
 
@@ -132,7 +132,7 @@ public class ShopController {
         // 实现逻辑：
         // 1. 调用 Service 层方法，传递 name 参数
         ShopQuery build = ShopQuery.builder()
-                                   .isDel(false)
+                                   .del(false)
                                    .name(name)
                                    .build();
 
@@ -151,7 +151,7 @@ public class ShopController {
     @Operation(summary = "获取店铺位置信息列表", description = "返回所有店铺的位置信息")
     public List<ShopLocationDto> getShopLocations() {
         ShopQuery build = ShopQuery.builder()
-                                   .isDel(false)
+                                   .del(false)
                                    .location(true)
                                    .build();
         List<Shop> shops = shopService.findList(build);

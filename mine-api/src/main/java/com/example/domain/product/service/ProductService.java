@@ -164,11 +164,11 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
         }
 
         // 根据是否删除进行查询
-        if (query.getIsDel() != null) {
-            where.and(product.isDel.eq(query.getIsDel()));
+        if (query.getDel() != null) {
+            where.and(product.del.eq(query.getDel()));
         }
-        if (query.getIsBatchManaged() != null) {
-            where.and(product.isBatchManaged.eq(query.getIsBatchManaged()));
+        if (query.getBatchManaged() != null) {
+            where.and(product.batchManaged.eq(query.getBatchManaged()));
         }
         if (query.getIds() != null) {
             where.and(product.id.in(query.getIds()));
@@ -206,7 +206,7 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
 
     public List<ProductDto> getProducts() {
         ProductQuery build = ProductQuery.builder()
-                                         .isDel(false)
+                                         .del(false)
                                          .includes(Set.of(ProductQuery.Include.CATEGORY))
                                          .build();
         List<Product> products = this.findList(build);

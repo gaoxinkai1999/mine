@@ -35,7 +35,7 @@ public class Shop {
     private LocalDate createTime =LocalDate.now();;
 
     @Column(name = "is_del", nullable = false)
-    private boolean isDel = false;
+    private boolean del = false;
 
 
     @Column(name = "arrears", nullable = false)

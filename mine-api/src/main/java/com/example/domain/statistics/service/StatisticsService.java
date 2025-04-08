@@ -67,7 +67,7 @@ public class StatisticsService {
      */
     public List<ShopStatisticsDTO> calculateShopStatistics() {
         ShopQuery shopQuery = ShopQuery.builder()
-                                       .isDel(false)
+                                       .del(false)
                                        .build();
 
         List<Shop> shops = shopService.findList(shopQuery);

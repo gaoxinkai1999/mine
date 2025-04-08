@@ -16,7 +16,7 @@ import java.util.Set;
 public class CategoryQuery implements BaseQuery {
     private Integer id;
     private String name;
-    private Boolean isDel;
+    private Boolean del;
     private Set<Include> includes = new HashSet<>();
 
     public enum Include {

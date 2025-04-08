@@ -35,9 +35,9 @@ public class InventoryDto {
         private String name;
         private BigDecimal costPrice;
         private BigDecimal defaultSalePrice;
-        private boolean isDel;
+        private boolean del;
         private int sort;
-        private boolean isBatchManaged = false;
+        private boolean batchManaged = false;
     }
 
     /**

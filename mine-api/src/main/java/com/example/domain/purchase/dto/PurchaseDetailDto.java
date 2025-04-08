@@ -42,5 +42,5 @@ public class PurchaseDetailDto {
      * 是否批次管理
      */
 
-    private Boolean isBatchManaged;
+    private Boolean batchManaged;
 } 

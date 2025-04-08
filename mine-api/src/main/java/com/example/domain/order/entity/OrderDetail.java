@@ -84,7 +84,7 @@ public class OrderDetail {
      * true表示使用商品设置的默认售价，false表示使用自定义价格
      */
     @Column(name = "is_default_price")
-    private boolean isDefaultPrice;
+    private boolean defaultPrice;
 
     @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude

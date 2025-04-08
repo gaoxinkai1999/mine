@@ -144,7 +144,7 @@
         <van-field v-model="newItem.costPrice" label="成本价" placeholder="请输入成本价" required type="number" />
         <van-field name="radio" label="管理批次" required>
           <template #input>
-            <van-radio-group v-model="newItem.isBatchManaged" direction="horizontal">
+            <van-radio-group v-model="newItem.batchManaged" direction="horizontal">
               <van-radio :name="true">是</van-radio>
               <van-radio :name="false">否</van-radio>
             </van-radio-group>
@@ -244,7 +244,7 @@ export default {
         defaultSalePrice: 0,
         categoryId: null,
         category: { id: null, name: "" },
-        isBatchManaged: false,
+        batchManaged: false,
         costPrice: 0,
       };
     },
@@ -276,22 +276,7 @@ export default {
         e.preventDefault();
       }
     },
-    
-    handleTouchStart() {
-      this.touchStartTime = Date.now();
-    },
-    handleTouchEnd(categoryId) {
-      const touchDuration = Date.now() - this.touchStartTime;
-      if (touchDuration < 200 && !this.isDragging) {
-        this.setActiveCategory(categoryId);
-      }
-      this.isDragging = false;
-    },
-    setActiveCategory(id) {
-      if (this.activeCategory !== id) {
-        this.activeCategory = id;
-      }
-    },
+
     async addCategory() {
       if (!this.newCategoryName.trim()) {
         showFailToast("品类名称不能为空");
@@ -340,7 +325,7 @@ export default {
         defaultSalePrice: item.defaultSalePrice,
         categoryId: item.categoryId,
         category: { id: item.categoryId, name: this.categories.find(c => c.id === item.categoryId).name },
-        isBatchManaged: item.batchManaged,
+        batchManaged: item.batchManaged,
         costPrice: item.costPrice,
       };
       this.isEdit = true;
@@ -409,19 +394,7 @@ export default {
         console.error('排序失败:', error);
       }
     },
-    async onCategoryDragEnd() {
-      try {
-        await api.category.update(
-          this.categories.map((item, index) => ({
-            id: item.id,
-            sort: index
-          }))
-        );
-        showSuccessToast('排序已更新');
-      } catch (error) {
-        console.error('排序失败:', error);
-      }
-    },
+
     async init() {
       await this.getCategories();
       await this.getProducts();

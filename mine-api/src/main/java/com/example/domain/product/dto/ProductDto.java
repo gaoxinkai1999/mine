@@ -22,10 +22,10 @@ public class ProductDto implements Serializable {
     private String name;
     private BigDecimal costPrice;
     private BigDecimal defaultSalePrice;
-    private boolean isDel;
+    private boolean del;
     private Integer categoryId;
     private int sort;
-    private boolean isBatchManaged;
+    private boolean batchManaged;
     private ProductStockDTO productStockDTO;
 
 

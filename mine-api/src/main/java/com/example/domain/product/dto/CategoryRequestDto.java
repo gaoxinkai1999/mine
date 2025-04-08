@@ -19,5 +19,5 @@ public class CategoryRequestDto implements Serializable {
     private Integer id;
     private String name;
     private Integer sort;
-    private Boolean isDel;
+    private Boolean del;
 }

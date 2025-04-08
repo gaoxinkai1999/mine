@@ -18,11 +18,11 @@
         </div>
         <div class="product-price">¥{{ formatAmount(product.purchasePrice) }}</div>
         <div class="product-spec">当前库存: {{ product.currentStock }}</div>
-        <div v-if="product.isForecastNormal===true" class="product-spec warning">预警库存: {{
+        <div v-if="product.forecastNormal===true" class="product-spec warning">预警库存: {{
             product.warningQuantity
           }}
         </div>
-        <div v-if="product.isForecastNormal===true" class="product-spec success">推荐采购数量:
+        <div v-if="product.forecastNormal===true" class="product-spec success">推荐采购数量:
           {{ product.recommendPurchaseQuantity }}
         </div>
       </div>

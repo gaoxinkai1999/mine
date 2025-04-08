@@ -54,7 +54,7 @@
             </div>
 
             <!-- 批次管理区块 -->
-            <div v-if="detail && detail.isBatchManaged" class="batch-management">
+            <div v-if="detail && detail.batchManaged" class="batch-management">
               <div class="batch-title">
                 <van-tag type="primary">批次管理</van-tag>
               </div>
@@ -135,7 +135,7 @@ const canSubmit = computed(() => {
   
   // 检查所有批次管理商品是否都填写了生产日期
   for (const detail of purchase.value.purchaseDetails) {
-    if (detail && detail.isBatchManaged) {
+    if (detail && detail.batchManaged) {
       const info = batchInfoMap[detail.id];
       if (!info || !info.productionDate) {
         return false;
@@ -170,7 +170,7 @@ const initBatchInfo = () => {
   if (!purchase.value || !purchase.value.purchaseDetails) return;
   
   purchase.value.purchaseDetails.forEach(detail => {
-    if (detail && detail.id && detail.isBatchManaged) {
+    if (detail && detail.id && detail.batchManaged) {
       batchInfoMap[detail.id] = {
         purchaseDetailId: detail.id,
         productionDate: null

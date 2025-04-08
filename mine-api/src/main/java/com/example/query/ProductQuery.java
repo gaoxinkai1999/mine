@@ -18,8 +18,8 @@ public class ProductQuery implements BaseQuery {
     private Integer id;
     private String name;
     private Integer categoryId;
-    private Boolean isDel;
-    private Boolean isBatchManaged;
+    private Boolean del;
+    private Boolean batchManaged;
     private List<Integer> ids;
 
     // 关联加载选项

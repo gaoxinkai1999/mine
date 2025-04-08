@@ -64,7 +64,7 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
     public List<ShopArrearsDto> arrears() {
         ShopQuery build = ShopQuery.builder()
                                    .havaArrears(true)
-                                   .isDel(false)
+                                   .del(false)
                                    .build();
         List<Shop> list = findList(build);
 
@@ -123,8 +123,8 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
             where.and(shop.pinyin.eq(query.getPinyin()));
         }
 
-        if (query.getIsDel() != null) {
-            where.and(shop.isDel.eq(query.getIsDel()));
+        if (query.getDel() != null) {
+            where.and(shop.del.eq(query.getDel()));
         }
 
         if (query.getSlow() != null) {

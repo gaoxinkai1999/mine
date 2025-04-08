@@ -21,8 +21,8 @@ public class ProductUpdateDto implements Serializable {
     private String name;
     private BigDecimal costPrice;
     private BigDecimal defaultSalePrice;
-    private Boolean isDel;
+    private Boolean del;
     private Integer sort;
     private Integer categoryId;
-    private Boolean isBatchManaged;
+    private Boolean batchManaged;
 }

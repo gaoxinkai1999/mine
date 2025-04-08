@@ -23,7 +23,7 @@ public class ShopDto implements Serializable {
     private String location;
     private char pinyin;
     private LocalDate createTime = LocalDate.now();
-    private boolean isDel = false;
+    private boolean del = false;
     private BigDecimal arrears;
     private BigDecimal longitude;
     private BigDecimal latitude;

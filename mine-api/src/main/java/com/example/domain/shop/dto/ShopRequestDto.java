@@ -21,7 +21,7 @@ public class ShopRequestDto implements Serializable {
     private String name;
     private String location;
     private Character pinyin;
-    private Boolean isDel = false;
+    private Boolean del = false;
     private BigDecimal arrears;
     private BigDecimal longitude;
     private BigDecimal latitude;
