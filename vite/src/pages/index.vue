@@ -12,7 +12,7 @@
         <h1 class="title">门店配送系统</h1>
         <div class="version-info">
           <h3 class="version">v{{ version }}</h3>
-          <span class="changelog" v-if="changelog">更新日志{{ changelog }}</span>
+          <span class="changelog" v-if="changelog">更新日志:{{ changelog }}</span>
         </div>
       </div>
     </header>
@@ -84,21 +84,12 @@ export default {
 
 <style scoped>
 .delivery-system {
-  min-height: 100vh;
   height: 100%;
   width: 100%;
   display: flex;
   flex-direction: column;
   background-color: #f7f8fa;
   position: relative;
-  overflow-y: auto;
-  padding-bottom: var(--van-tabbar-height);
-}
-
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .delivery-system {
-    padding-bottom: calc(var(--van-tabbar-height) + env(safe-area-inset-bottom, 0px));
-  }
 }
 
 .header {
@@ -137,7 +128,6 @@ export default {
   padding: 20px 16px;
   width: 100%;
   box-sizing: border-box;
-  overflow-y: auto;
 }
 
 .menu-grid {
@@ -195,6 +185,4 @@ export default {
   color: #999;
   text-decoration: none;
 }
-
-/* 自适应底部tabbar的存在，不再需要具体高度计算，由App.vue全局类处理 */
 </style>

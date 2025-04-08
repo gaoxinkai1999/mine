@@ -1,5 +1,4 @@
 import {defineStore} from 'pinia'
-import locationService from "@/utils/locationService.js";
 
 // 使用 defineStore 定义 store
 export const useMyStore = defineStore('my', {

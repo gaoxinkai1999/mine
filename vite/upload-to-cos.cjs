@@ -1,5 +1,4 @@
 const COS = require('cos-nodejs-sdk-v5');
-const fs = require('fs');
 const path = require('path');
 
 // ========== 配置区域 ==========

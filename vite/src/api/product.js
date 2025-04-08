@@ -59,22 +59,6 @@ const api = {
       method: 'POST',
       data
     })
-  },
-
-  /**
-   * @description 获取店铺可售商品列表（包含库存信息）
-   * @url /product/sale-list
-   * @method GET
-   * @param {Object} params Query parameters
-   * @param {number} params.shopId 
-   * @returns {Promise<any>}
-   */
-  getProductSaleList(params = {}) {
-    return request({
-      url: '/product/sale-list',
-      method: 'GET',
-      params
-    })
   }
 }
 

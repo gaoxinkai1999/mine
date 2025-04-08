@@ -171,25 +171,25 @@ html, body {
   padding: 0;
   height: 100%;
   width: 100%;
-  overflow: visible;
+  overflow: hidden;
   background: #f7f8fa;
 }
 
 .app-container {
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
   position: relative;
   background: #f7f8fa;
+  overflow: hidden;
 }
 
 .main-content {
   flex: 1;
   position: relative;
   width: 100%;
-  /* 允许内容溢出并滚动，但默认行为交给子页面控制 */
-  overflow: visible;
+  overflow: auto;
 }
 
 /* 只有当显示tabbar时才应用底部填充 */
@@ -244,8 +244,15 @@ html, body {
 
 /* 修复Safari中的滚动问题 */
 @supports (-webkit-touch-callout: none) {
-  body, .app-container, .main-content {
+  body, .app-container {
+    height: 100%;
     -webkit-overflow-scrolling: touch;
+  }
+  
+  .main-content {
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+    overflow: auto;
   }
 }
 

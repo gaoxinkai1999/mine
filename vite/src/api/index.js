@@ -21,5 +21,5 @@ export default {
   inventory,
   inventoryTransaction,
   category,
-  batch,
+  batch
 }

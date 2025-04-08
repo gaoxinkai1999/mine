@@ -1,6 +1,6 @@
 <route>
 {
-  name: "statistics-monthly"
+name: "statistics-monthly"
 }
 </route>
 
@@ -9,22 +9,24 @@
     <div class="month-statistics">
       <div class="page-header">
         <h2 class="title">月度销售数据</h2>
-        <span class="date-range">{{ startDateDisplay }} 至 {{ formatDate(new Date()) }}</span>
+        <!-- 显示实际获取到的数据范围或固定范围 -->
+        <span class="date-range">{{ startDateDisplay }} 至 {{ endDateDisplay }}</span>
       </div>
 
       <!-- 数据卡片组 -->
       <div class="stats-cards">
-        <van-empty v-if="!tableData || tableData.length === 0" description="暂无数据" />
-        
+        <van-empty v-if="!tableData || tableData.length === 0 && !loading" description="暂无数据" />
+
+        <!-- 修改 v-for 循环，直接遍历处理后的 tableData 数组 -->
         <StatsCard
-          v-for="(data, index) in tableData"
-          :key="index"
-          :title="data.monthName"
-          :tag="(data.growthRate > 0 ? '+' : '') + (data.growthRate * 100).toFixed(2) + '%'"
-          :tag-class="getGrowthClass(data.growthRate)"
-          :stats="data"
-          :expanded="expandedCard === index"
-          @toggle-expand="toggleCard(index)"
+            v-for="(data, index) in tableData"
+            :key="data.yearMonth || index"
+        :title="data.monthName"
+        :tag="(data.growthRate > 0 ? '+' : '') + (data.growthRate * 100).toFixed(2) + '%'"
+        :tag-class="getGrowthClass(data.growthRate)"
+        :stats="data"
+        :expanded="expandedCard === (data.yearMonth || index)"
+        @toggle-expand="toggleCard(data.yearMonth || index)"
         />
       </div>
     </div>
@@ -35,137 +37,135 @@
 import api from "@/api/index.js";
 import { showToast } from "vant";
 import StatsCard from "@/components/StatsCard.vue";
+import { ref, computed, onMounted } from 'vue'; // 引入 Vue 3 Composition API
 
 export default {
   name: "MonthData",
   components: {
     StatsCard
   },
-  data() {
-    return {
-      tableData: [],
-      expandedCard: null,
-      loading: false,
-      startDate: "2024-02-01"
-    }
-  },
-  computed: {
-    startDateDisplay() {
-      return this.startDate;
-    }
-  },
-  mounted() {
-    this.getData();
-  },
-  methods: {
-    getGrowthClass(growth) {
-      if (growth > 0) return 'growth-positive';
-      if (growth < 0) return 'growth-negative';
-      return 'growth-neutral';
-    },
-    formatNumber(num) {
-      return new Intl.NumberFormat().format(num || 0);
-    },
-    formatDate(date) {
-      // Ensure date is a valid Date object before formatting
-      if (!(date instanceof Date) || isNaN(date)) {
-        console.warn('Invalid date passed to formatDate:', date);
-        return ''; // Return empty string for invalid dates
-      }
-      return date.toLocaleDateString('zh-CN', {
+  setup() { // 使用 setup 函数
+    const tableData = ref([]); // 月度统计数据数组
+    const expandedCard = ref(null); // 当前展开的卡片 key
+    const loading = ref(false); // 下拉刷新状态
+    const initialStartDate = "2024-02-01"; // 初始开始日期
+    const startDate = ref(initialStartDate); // 实际使用的开始日期 (可以响应式)
+    const endDate = ref(new Date()); // 结束日期默认为今天
+
+    // 显示用的日期范围
+    const startDateDisplay = computed(() => formatDate(new Date(startDate.value)));
+    const endDateDisplay = computed(() => formatDate(endDate.value));
+
+    // --- 方法 ---
+    const formatDate = (date) => {
+      if (!date || isNaN(new Date(date))) return '';
+      const d = new Date(date);
+      return d.toLocaleDateString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
       }).replace(/\//g, '-');
-    },
-    toggleCard(index) {
-      if (this.expandedCard === index) {
-        this.expandedCard = null;
-      } else {
-        this.expandedCard = index;
-      }
-    },
-    async onRefresh() {
-      await this.getData();
-      setTimeout(() => {
-        showToast("刷新成功");
-        this.loading = false;
-      }, 1000);
-    },
-    // 获取月份的第一天和最后一天
-    getMonthBounds(year, month) {
-      const firstDay = new Date(year, month - 1, 1);
-      const lastDay = new Date(year, month, 0);
-      return {
-        firstDay,
-        lastDay
-      };
-    },
-    // 获取当前月份的名称
-    getMonthName(year, month) {
-      return `${year}年${month}月`;
-    },
-    async getData() {
+    };
+
+    const getGrowthClass = (growth) => {
+      if (growth > 0) return 'growth-positive';
+      if (growth < 0) return 'growth-negative';
+      return 'growth-neutral';
+    };
+
+    const toggleCard = (key) => {
+      expandedCard.value = expandedCard.value === key ? null : key;
+    };
+
+    const onRefresh = async () => {
+      loading.value = true;
+      await getData();
+      // 移除 setTimeout，让加载状态在数据获取后自然结束
+      showToast("刷新成功");
+      loading.value = false;
+    };
+
+    // 格式化后端返回的 YearMonth 字符串为 "YYYY年MM月"
+    const formatMonthName = (yearMonthStr) => {
+      if (!yearMonthStr || typeof yearMonthStr !== 'string') return '未知月份';
       try {
-        const startDateObj = new Date(this.startDate);
-        const today = new Date();
-        
-        // 准备月份数据结构
-        const monthsData = [];
-        let currentYear = startDateObj.getFullYear();
-        let currentMonth = startDateObj.getMonth() + 1;
-        let endYear = today.getFullYear();
-        let endMonth = today.getMonth() + 1;
-        
-        while (
-          currentYear < endYear || 
-          (currentYear === endYear && currentMonth <= endMonth)
-        ) {
-          const { firstDay, lastDay } = this.getMonthBounds(currentYear, currentMonth);
-          
-          // 如果是当前月份，使用今天作为结束日期
-          const endDate = (currentYear === endYear && currentMonth === endMonth) 
-            ? today 
-            : lastDay;
-          
-          // 调用API获取该月数据
-          const monthData = await api.statistics.getDateRangeStatistics({
-            startDate: this.formatDate(firstDay),
-            endDate: this.formatDate(endDate)
-          });
-          
-          // 计算环比增长率
-          let growthRate = 0;
-          if (monthsData.length > 0) {
-            const prevMonthProfit = monthsData[monthsData.length - 1].totalProfit;
-            if (prevMonthProfit && prevMonthProfit > 0) {
-              growthRate = (monthData.totalProfit - prevMonthProfit) / prevMonthProfit;
-            }
-          }
-          
-          // 添加月份名称和增长率
-          monthsData.push({
-            ...monthData,
-            monthName: this.getMonthName(currentYear, currentMonth),
+        const [year, month] = yearMonthStr.split('-');
+        return `${year}年${parseInt(month, 10)}月`;
+      } catch (e) {
+        return '格式错误';
+      }
+    };
+
+    // 计算环比增长率 (在前端计算)
+    const calculateGrowthRate = (currentProfit, previousProfit) => {
+      if (previousProfit && previousProfit !== 0) {
+        return (currentProfit - previousProfit) / previousProfit;
+      }
+      return 0; // 如果上月利润为0或不存在，增长率为0
+    };
+
+    // 修改后的 getData 方法
+    const getData = async () => {
+      loading.value = true; // 开始加载状态
+      try {
+        const formattedStartDate = formatDate(new Date(startDate.value));
+        const formattedEndDate = formatDate(endDate.value);
+
+        // **一次性调用新的后端接口**
+        const responseData = await api.statistics.getMonthlyStatistics({
+          startDate: formattedStartDate,
+          endDate: formattedEndDate
+        });
+
+        // **处理后端返回的数据 (假设后端返回 Map<String, SalesStatisticsDTO>，key为"YYYY-MM")**
+        const processedData = [];
+        let previousProfit = null; // 用于计算环比
+
+        // 将 Map 转换为有序数组 (假设后端返回的Map是按时间顺序的，比如LinkedHashMap)
+        // 如果后端返回的是无序Map，需要先排序
+        const sortedKeys = Object.keys(responseData).sort(); // 按 "YYYY-MM" 排序
+
+        for (const yearMonthStr of sortedKeys) {
+          const monthStats = responseData[yearMonthStr];
+          const growthRate = calculateGrowthRate(monthStats.totalProfit, previousProfit);
+
+          processedData.push({
+            ...monthStats,
+            yearMonth: yearMonthStr, // 保存 YYYY-MM 字符串作为 key
+            monthName: formatMonthName(yearMonthStr),
             growthRate: growthRate
           });
-          
-          // 移动到下个月
-          if (currentMonth === 12) {
-            currentYear++;
-            currentMonth = 1;
-          } else {
-            currentMonth++;
-          }
+          previousProfit = monthStats.totalProfit; // 更新上个月利润
         }
-        
-        // 倒序排列，最近的月份在前面
-        this.tableData = monthsData.reverse();
+
+        // **倒序排列，让最新的月份显示在最前面**
+        tableData.value = processedData.reverse();
+
       } catch (error) {
         showToast("获取数据失败");
         console.error('获取月度统计数据失败:', error);
+      } finally {
+        loading.value = false; // 结束加载状态
       }
-    }
+    };
+
+    // 生命周期钩子
+    onMounted(() => {
+      getData();
+    });
+
+    return {
+      tableData,
+      expandedCard,
+      loading,
+      startDateDisplay,
+      endDateDisplay,
+      formatDate,
+      getGrowthClass,
+      toggleCard,
+      onRefresh,
+      getData
+    };
   }
 }
 </script>
@@ -200,135 +200,7 @@ export default {
   gap: 16px;
 }
 
-.stats-card {
-  background-color: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 2px 12px rgba(100, 101, 102, 0.08);
-  transition: all 0.3s ease;
-}
+/* StatsCard 的样式在组件内部定义，这里无需重复 */
 
-.stats-card.expanded {
-  box-shadow: 0 4px 16px rgba(100, 101, 102, 0.12);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.card-title {
-  font-size: 16px;
-  font-weight: bold;
-  color: #323233;
-  margin: 0;
-}
-
-.growth-tag {
-  font-size: 14px;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.growth-positive {
-  color: #07c160;
-  background-color: rgba(7, 193, 96, 0.1);
-}
-
-.growth-negative {
-  color: #ee0a24;
-  background-color: rgba(238, 10, 36, 0.1);
-}
-
-.growth-neutral {
-  color: #969799;
-  background-color: #f2f3f5;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-}
-
-.stat-icon {
-  font-size: 24px;
-  color: #1989fa;
-  margin-right: 12px;
-}
-
-.stat-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #969799;
-  margin-bottom: 4px;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: bold;
-  color: #323233;
-}
-
-.details-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #ebedf0;
-}
-
-.details-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.details-header h4 {
-  font-size: 14px;
-  color: #323233;
-  margin: 0;
-}
-
-.total-cost {
-  font-size: 14px;
-  color: #969799;
-}
-
-.product-table {
-  width: 100%;
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th, td {
-  text-align: left;
-  padding: 8px;
-  border-bottom: 1px solid #ebedf0;
-}
-
-th {
-  font-size: 12px;
-  font-weight: normal;
-  color: #969799;
-}
-
-td {
-  font-size: 14px;
-  color: #323233;
-}
+/* 可以在这里添加特定于 MonthData 页面的额外样式 */
 </style>

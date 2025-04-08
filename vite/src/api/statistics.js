@@ -49,6 +49,23 @@ const api = {
   },
 
   /**
+   * @description 获取月度统计数据
+   * @url /statistics/monthly
+   * @method GET
+   * @param {Object} params Query parameters
+   * @param {string} params.startDate 
+   * @param {string} params.endDate 
+   * @returns {Promise<any>}
+   */
+  getMonthlyStatistics(params = {}) {
+    return request({
+      url: '/statistics/monthly',
+      method: 'GET',
+      params
+    })
+  },
+
+  /**
    * @description 获取日期范围统计数据
    * @url /statistics/date-range
    * @method GET

@@ -1,9 +1,11 @@
 package com.example.domain.statistics.service;
 
 import com.example.domain.order.entity.Order;
-import com.example.domain.order.entity.OrderDetail;
+import com.example.domain.order.entity.QOrder;
+import com.example.domain.order.entity.QOrderDetail;
 import com.example.domain.order.service.OrderService;
 import com.example.domain.product.entity.Product;
+import com.example.domain.product.entity.QProduct;
 import com.example.domain.product.service.ProductService;
 import com.example.domain.shop.entity.Shop;
 import com.example.domain.shop.service.ShopService;
@@ -17,6 +19,12 @@ import com.example.query.ProductQuery;
 import com.example.query.ShopQuery;
 import com.example.utils.DataExtractor;
 import com.example.utils.MovingAverageCalculator;
+import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.DateTemplate;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberTemplate;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,6 +32,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
@@ -46,6 +56,9 @@ public class StatisticsService {
 
     @Autowired
     private ProductService productService; // 商品模块服务
+    @Autowired
+    private JPAQueryFactory queryFactory;
+
 
     /**
      * 计算所有商家的统计数据
@@ -72,104 +85,280 @@ public class StatisticsService {
                     .collect(Collectors.toList());
     }
 
+
+
     /**
-     * 日期范围统计方法
-     * 计算指定日期范围内的销售统计数据
+     * 计算指定日期范围内每个月的销售统计数据（优化版）
      *
      * @param startDate 开始日期
      * @param endDate   结束日期
-     * @return 销售统计数据
+     * @return Map<YearMonth, SalesStatisticsDTO> 按年月分组的统计数据
      */
-    public SalesStatisticsDTO calculateDateRangeStatistics(LocalDate startDate, LocalDate endDate) {
-        OrderQuery build = OrderQuery.builder()
-                                     .startTime(startDate)
-                                     .endTime(endDate)
-                                     .includes(Set.of(OrderQuery.Include.DETAILS, OrderQuery.Include.PRODUCT))
-                                     .build();
-        List<Order> orders = orderService.findList(build);
-        return calculateStatistics(orders);
-    }
+    public Map<YearMonth, SalesStatisticsDTO> calculateMonthlyStatisticsOptimized(LocalDate startDate, LocalDate endDate) {
+        QOrder qOrder = QOrder.order;
+        QOrderDetail qOrderDetail = QOrderDetail.orderDetail;
+        QProduct qProduct = QProduct.product;
 
-    /**
-     * 计算每日销售统计数据
-     *
-     * @param startDate 开始日期
-     * @param endDate   结束日期
-     * @return 每日销售统计数据
-     */
-    public Map<LocalDate, SalesStatisticsDTO> calculateDailyStatistics(LocalDate startDate, LocalDate endDate) {
-        OrderQuery orderQuery = OrderQuery.builder()
-                                          .startTime(startDate)
-                                          .endTime(endDate)
-                                          .includes(Set.of(OrderQuery.Include.DETAILS, OrderQuery.Include.PRODUCT))
-                                          .build();
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        // 结束时间通常应包含 endDate 当天，所以用 lt(endDate + 1 day)
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
 
-        List<Order> allOrders = orderService.findList(orderQuery);
+        // --- 定义用于分组的 Year 和 Month 表达式 ---
+        // 根据你的数据库调整 YEAR() 和 MONTH() 函数
+        NumberTemplate<Integer> yearExpression = Expressions.numberTemplate(Integer.class, "YEAR({0})", qOrder.createTime);
+        NumberTemplate<Integer> monthExpression = Expressions.numberTemplate(Integer.class, "MONTH({0})", qOrder.createTime);
 
-        // 按日期分组
-        Map<LocalDate, List<Order>> ordersByDate = allOrders.stream()
-                                                            .collect(Collectors.groupingBy(order -> order.getCreateTime()
-                                                                                                         .toLocalDate()));
+        // --- 查询 1: 获取每月总体统计 ---
+        List<Tuple> monthlyTotals = queryFactory
+                .select(
+                        yearExpression,
+                        monthExpression,
+                        qOrder.id.countDistinct(),
+                        qOrder.totalSalesAmount.sum().coalesce(BigDecimal.ZERO),
+                        qOrder.totalProfit.sum().coalesce(BigDecimal.ZERO)
+                )
+                .from(qOrder)
+                .where(qOrder.createTime.goe(startDateTime).and(qOrder.createTime.lt(endDateTime)))
+                .groupBy(yearExpression, monthExpression) // 按年和月分组
+                .orderBy(yearExpression.asc(), monthExpression.asc()) // 按年月排序
+                .fetch();
 
-        // 计算每日统计
-        Map<LocalDate, SalesStatisticsDTO> dailyStatistics = new LinkedHashMap<>();
-        LocalDate currentDate = startDate;
-        while (!currentDate.isAfter(endDate)) {
-            List<Order> dailyOrders = ordersByDate.getOrDefault(currentDate, Collections.emptyList());
-            dailyStatistics.put(currentDate, calculateStatistics(dailyOrders));
-            currentDate = currentDate.plusDays(1);
+        // --- 查询 2: 获取每月每商品详细统计 ---
+        List<Tuple> monthlyProductDetails = queryFactory
+                .select(
+                        yearExpression,
+                        monthExpression,
+                        qProduct.id,
+                        qProduct.name,
+                        qOrderDetail.quantity.sum().coalesce(0),
+                        qOrderDetail.totalSalesAmount.sum().coalesce(BigDecimal.ZERO),
+                        qOrderDetail.totalProfit.sum().coalesce(BigDecimal.ZERO)
+                )
+                .from(qOrderDetail)
+                .join(qOrderDetail.order, qOrder)
+                .join(qOrderDetail.product, qProduct)
+                .where(qOrder.createTime.goe(startDateTime).and(qOrder.createTime.lt(endDateTime)))
+                .groupBy(yearExpression, monthExpression, qProduct.id, qProduct.name) // 按年月和产品分组
+                .orderBy(yearExpression.asc(), monthExpression.asc(), qProduct.id.asc())
+                .fetch();
+
+        // --- 合并结果到 Map<YearMonth, SalesStatisticsDTO> ---
+        Map<YearMonth, SalesStatisticsDTO> monthlyStatsMap = new LinkedHashMap<>();
+
+        // 处理总体统计
+        for (Tuple row : monthlyTotals) {
+            Integer year = row.get(yearExpression);
+            Integer month = row.get(monthExpression);
+            if (year == null || month == null) continue;
+
+            YearMonth yearMonth = YearMonth.of(year, month);
+            SalesStatisticsDTO statsDto = new SalesStatisticsDTO();
+            statsDto.setOrderCount(row.get(2, Long.class).intValue());
+            statsDto.setTotalSales(row.get(3, BigDecimal.class));
+            statsDto.setTotalProfit(row.get(4, BigDecimal.class));
+            statsDto.setTotalCost(statsDto.getTotalSales().subtract(statsDto.getTotalProfit()));
+            statsDto.setProductSalesInfoDTOS(new ArrayList<>()); // 初始化产品列表
+            monthlyStatsMap.put(yearMonth, statsDto);
         }
 
-        return dailyStatistics;
+        // 处理产品详情统计
+        for (Tuple row : monthlyProductDetails) {
+            Integer year = row.get(yearExpression);
+            Integer month = row.get(monthExpression);
+            if (year == null || month == null) continue;
+
+            YearMonth yearMonth = YearMonth.of(year, month);
+            SalesStatisticsDTO statsDto = monthlyStatsMap.get(yearMonth);
+            // 如果某个月份只有详情而没有总体统计（理论上不可能），则跳过
+            if (statsDto == null) continue;
+
+            ProductSalesInfoDTO productInfo = new ProductSalesInfoDTO();
+            productInfo.setProductId(row.get(qProduct.id));
+            productInfo.setProductName(row.get(qProduct.name));
+            Number quantitySum = row.get(4, Number.class); // 获取为 Number
+            productInfo.setQuantity(quantitySum != null ? quantitySum.intValue() : 0); // 转换为 int
+            productInfo.setTotalSales(row.get(5, BigDecimal.class));
+            productInfo.setTotalProfit(row.get(6, BigDecimal.class));
+
+            statsDto.getProductSalesInfoDTOS().add(productInfo);
+        }
+
+        // --- 填充缺失的月份 ---
+        Map<YearMonth, SalesStatisticsDTO> finalResultMap = new LinkedHashMap<>();
+        YearMonth currentMonth = YearMonth.from(startDate);
+        YearMonth endMonth = YearMonth.from(endDate);
+
+        while (!currentMonth.isAfter(endMonth)) {
+            finalResultMap.put(currentMonth, monthlyStatsMap.getOrDefault(currentMonth, createEmptySalesStatistics()));
+            currentMonth = currentMonth.plusMonths(1);
+        }
+
+        return finalResultMap;
     }
 
-    /**
-     * 核心统计计算逻辑
-     * 用于统计给定的订单列表中的销售总额、利润总额、销售数量 的总和信息和各商品的销售统计信息
-     *
-     * @param orders 需要统计的订单列表
-     * @return 统计结果DTO对象
-     */
-    private SalesStatisticsDTO calculateStatistics(List<Order> orders) {
-        // 创建统计结果DTO对象
+    public SalesStatisticsDTO calculateDateRangeStatistics(LocalDate startDate, LocalDate endDate) {
+        QOrder qOrder = QOrder.order;
+        QOrderDetail qOrderDetail = QOrderDetail.orderDetail;
+        QProduct qProduct = QProduct.product;
+
+        // 定义时间范围
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        // 结束时间需要包含当天的最后一秒，或者查询时用 < 次日开始时间
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+
+        // 1. 查询总体统计数据 (订单数, 总销售额, 总利润)
+        Tuple overallStats = queryFactory
+                .select(
+                        qOrder.id.count(),
+                        qOrder.totalSalesAmount.sum().coalesce(BigDecimal.ZERO), // coalesce 处理可能为null的SUM结果
+                        qOrder.totalProfit.sum().coalesce(BigDecimal.ZERO)
+                )
+                .from(qOrder)
+                .where(qOrder.createTime.goe(startDateTime).and(qOrder.createTime.lt(endDateTime))) // 使用 >= start 和 < end+1天
+                .fetchOne(); // 预期只有一行结果
+
         SalesStatisticsDTO result = new SalesStatisticsDTO();
-        // 设置订单总数
-        result.setOrderCount(orders.size());
+        if (overallStats != null) {
+            result.setOrderCount(overallStats.get(0, Long.class).intValue()); // count返回Long
+            result.setTotalSales(overallStats.get(1, BigDecimal.class));
+            result.setTotalProfit(overallStats.get(2, BigDecimal.class));
+            // 计算总成本
+            result.setTotalCost(result.getTotalSales().subtract(result.getTotalProfit()));
+        } else {
+            // 如果没有订单，则所有统计数据为0
+            result.setOrderCount(0);
+            result.setTotalSales(BigDecimal.ZERO);
+            result.setTotalProfit(BigDecimal.ZERO);
+            result.setTotalCost(BigDecimal.ZERO);
+            result.setProductSalesInfoDTOS(new ArrayList<>());
+            return result; // 如果没有订单，直接返回0值DTO
+        }
 
-        // 计算总销售额:
-        // 1. 遍历所有订单
-        // 2. 获取每个订单的销售金额(如果为空则取0)
-        // 3. 将所有订单销售额累加
-        BigDecimal totalSales = orders.stream()
-                                      .map(order -> order.getTotalSalesAmount() != null ? order.getTotalSalesAmount() : BigDecimal.ZERO)
-                                      .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 计算总利润:
-        // 1. 遍历所有订单
-        // 2. 获取每个订单的利润(如果为空则取0)
-        // 3. 将所有订单利润累加
-        BigDecimal totalProfit = orders.stream()
-                                       .map(order -> order.getTotalProfit() != null ? order.getTotalProfit() : BigDecimal.ZERO)
-                                       .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 2. 查询按商品分组的统计数据 (商品ID, 名称, 数量, 销售额, 利润)
+        List<ProductSalesInfoDTO> productStats = queryFactory
+                .select(Projections.constructor(ProductSalesInfoDTO.class, // 使用构造函数投影到DTO
+                        qProduct.id,
+                        qProduct.name,
+                        qOrderDetail.quantity.sum().coalesce(0), // 数量总和
+                        qOrderDetail.totalSalesAmount.sum().coalesce(BigDecimal.ZERO), // 销售额总和
+                        qOrderDetail.totalProfit.sum().coalesce(BigDecimal.ZERO) // 利润总和
+                ))
+                .from(qOrderDetail)
+                .join(qOrderDetail.order, qOrder) // 关联订单以过滤时间
+                .join(qOrderDetail.product, qProduct) // 关联产品以获取名称和ID
+                .where(qOrder.createTime.goe(startDateTime).and(qOrder.createTime.lt(endDateTime)))
+                .groupBy(qProduct.id, qProduct.name) // 按产品ID和名称分组
+                .orderBy(qProduct.id.asc()) // 可选排序
+                .fetch();
 
-        // 计算总成本:
-        // 1. 遍历所有订单
-        // 2. 计算每个订单的成本(销售额-利润)
-        // 3. 将所有订单成本累加
-        BigDecimal totalCost = orders.stream()
-                                     .map(order -> order.getTotalSalesAmount()
-                                                        .subtract(order.getTotalProfit()))
-                                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        // 设置统计结果
-        result.setTotalCost(totalCost);        // 设置总成本
-        result.setTotalProfit(totalProfit);    // 设置总利润
-        result.setTotalSales(totalSales);      // 设置总销售额
-        // 计算并设置各产品的销售数量信息
-        result.setProductSalesInfoDTOS(calculateProductQuantities(orders));
+        result.setProductSalesInfoDTOS(productStats);
 
         return result;
     }
+    public Map<LocalDate, SalesStatisticsDTO> calculateDailyStatistics(LocalDate startDate, LocalDate endDate) {
+        QOrder qOrder = QOrder.order;
+        QOrderDetail qOrderDetail = QOrderDetail.orderDetail;
+        QProduct qProduct = QProduct.product;
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+
+        // 修改1: 期望接收 java.sql.Date
+        DateTemplate<java.sql.Date> orderSqlDate = Expressions.dateTemplate(java.sql.Date.class, "DATE({0})", qOrder.createTime);
+
+        // --- 查询 1: 获取每日总体统计 ---
+        List<Tuple> dailyTotals = queryFactory
+                .select(
+                        orderSqlDate, // 使用新的 DateTemplate
+                        qOrder.id.countDistinct(),
+                        qOrder.totalSalesAmount.sum().coalesce(BigDecimal.ZERO),
+                        qOrder.totalProfit.sum().coalesce(BigDecimal.ZERO)
+                )
+                .from(qOrder)
+                .where(qOrder.createTime.goe(startDateTime).and(qOrder.createTime.lt(endDateTime)))
+                .groupBy(orderSqlDate) // 按 sql.Date 分组
+                .orderBy(orderSqlDate.asc())
+                .fetch();
+
+        Map<LocalDate, SalesStatisticsDTO> dailyStatsMap = new LinkedHashMap<>();
+        for (Tuple row : dailyTotals) {
+            // 修改2: 获取 java.sql.Date 并转换为 java.time.LocalDate
+            java.sql.Date sqlDate = row.get(orderSqlDate);
+            if (sqlDate == null) continue;
+            LocalDate date = sqlDate.toLocalDate(); // 转换
+
+            SalesStatisticsDTO statsDto = new SalesStatisticsDTO();
+            statsDto.setOrderCount(row.get(1, Long.class).intValue());
+            statsDto.setTotalSales(row.get(2, BigDecimal.class));
+            statsDto.setTotalProfit(row.get(3, BigDecimal.class));
+            statsDto.setTotalCost(statsDto.getTotalSales().subtract(statsDto.getTotalProfit()));
+            statsDto.setProductSalesInfoDTOS(new ArrayList<>());
+            dailyStatsMap.put(date, statsDto);
+        }
+
+        // --- 查询 2: 获取每日每商品详细统计 ---
+        List<Tuple> dailyProductDetails = queryFactory
+                .select(
+                        orderSqlDate, // 使用新的 DateTemplate
+                        qProduct.id,
+                        qProduct.name,
+                        qOrderDetail.quantity.sum().coalesce(0),
+                        qOrderDetail.totalSalesAmount.sum().coalesce(BigDecimal.ZERO),
+                        qOrderDetail.totalProfit.sum().coalesce(BigDecimal.ZERO)
+                )
+                .from(qOrderDetail)
+                .join(qOrderDetail.order, qOrder)
+                .join(qOrderDetail.product, qProduct)
+                .where(qOrder.createTime.goe(startDateTime).and(qOrder.createTime.lt(endDateTime)))
+                .groupBy(orderSqlDate, qProduct.id, qProduct.name) // 按 sql.Date 和产品分组
+                .orderBy(orderSqlDate.asc(), qProduct.id.asc())
+                .fetch();
+
+        // --- 合并结果 ---
+        for (Tuple row : dailyProductDetails) {
+            // 修改2: 获取 java.sql.Date 并转换为 java.time.LocalDate
+            java.sql.Date sqlDate = row.get(orderSqlDate);
+            if (sqlDate == null) continue;
+            LocalDate date = sqlDate.toLocalDate(); // 转换
+
+            SalesStatisticsDTO statsDto = dailyStatsMap.get(date);
+            if (statsDto == null) continue;
+
+            ProductSalesInfoDTO productInfo = new ProductSalesInfoDTO();
+            productInfo.setProductId(row.get(qProduct.id));
+            productInfo.setProductName(row.get(qProduct.name));
+            // 处理可能的类型转换 (sum 可能返回 Long 或 Integer)
+            Number quantitySum = row.get(3, Number.class);
+            productInfo.setQuantity(quantitySum != null ? quantitySum.intValue() : 0);
+            productInfo.setTotalSales(row.get(4, BigDecimal.class));
+            productInfo.setTotalProfit(row.get(5, BigDecimal.class));
+
+            statsDto.getProductSalesInfoDTOS().add(productInfo);
+        }
+
+        // --- 填充缺失日期 ---
+        Map<LocalDate, SalesStatisticsDTO> finalResultMap = new LinkedHashMap<>();
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            finalResultMap.put(currentDate, dailyStatsMap.getOrDefault(currentDate, createEmptySalesStatistics()));
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return finalResultMap;
+    }
+
+    // 创建一个空的 SalesStatisticsDTO 用于填充无销售的日期
+    private SalesStatisticsDTO createEmptySalesStatistics() {
+        SalesStatisticsDTO emptyStats = new SalesStatisticsDTO();
+        emptyStats.setOrderCount(0);
+        emptyStats.setTotalSales(BigDecimal.ZERO);
+        emptyStats.setTotalProfit(BigDecimal.ZERO);
+        emptyStats.setTotalCost(BigDecimal.ZERO);
+        emptyStats.setProductSalesInfoDTOS(new ArrayList<>());
+        return emptyStats;
+    }
+
 
 
     /**
@@ -211,58 +400,6 @@ public class StatisticsService {
         return result;
     }
 
-    /**
-     * 计算给定orders中各商品的销售数量、销售额和利润统计总和
-     *
-     * @param orders 订单列表
-     * @return List<ProductSalesInfoDTO> 各商品的销售统计结果
-     */
-    private List<ProductSalesInfoDTO> calculateProductQuantities(List<Order> orders) {
-        // 创建一个 Map，用于存储商品ID和对应的销售统计信息
-        // key: 商品ID, value: 商品销售统计信息DTO
-        Map<Integer, ProductSalesInfoDTO> productQuantityMap = new HashMap<>();
-
-        // 遍历所有订单及订单明细,统计每个商品的销售信息
-        for (Order order : orders) {
-            // 遍历订单中的每个商品明细
-            for (OrderDetail item : order.getOrderDetails()) {
-                // 获取商品基本信息
-                int productId = item.getProduct()
-                                    .getId();        // 商品ID
-                int quantity = item.getQuantity();                     // 销售数量
-                String name = item.getProduct()
-                                  .getName();        // 商品名称
-                BigDecimal sales = item.getTotalSalesAmount();    // 商品销售额
-                BigDecimal profit = item.getTotalProfit();        // 商品利润
-
-                // 获取或创建商品销售统计DTO
-                ProductSalesInfoDTO dto = productQuantityMap.get(productId);
-                if (dto == null) {
-                    // 如果是第一次统计该商品,创建新的统计DTO
-                    dto = new ProductSalesInfoDTO();
-                    dto.setProductId(productId);
-                    dto.setProductName(name);
-                    dto.setQuantity(quantity);
-                    dto.setTotalSales(sales);
-                    dto.setTotalProfit(profit);
-                    productQuantityMap.put(productId, dto);
-                } else {
-                    // 如果已存在该商品统计,累加数量、销售额和利润
-                    dto.setQuantity(dto.getQuantity() + quantity);
-                    dto.setTotalSales(dto.getTotalSales()
-                                         .add(sales));
-                    dto.setTotalProfit(dto.getTotalProfit()
-                                          .add(profit));
-                }
-            }
-        }
-
-        // 将Map转换为List并过滤掉销量为0的商品
-        return productQuantityMap.values()
-                                 .stream()
-                                 .filter(dto -> dto.getQuantity() > 0)   // 只保留有销量的商品
-                                 .collect(Collectors.toList());           // 收集结果到List
-    }
 
 
     /**

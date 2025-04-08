@@ -1,6 +1,8 @@
 package com.example.domain.statistics.dto.response;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
@@ -13,6 +15,8 @@ import java.math.BigDecimal;
  */
 @Getter
 @Setter
+@AllArgsConstructor
+@NoArgsConstructor
 
 public class ProductSalesInfoDTO {
     private int productId; // 商品ID

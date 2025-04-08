@@ -2,51 +2,6 @@ import request from '@/utils/axiosConfig'
 
 const api = {
   /**
-   * @description 更新批次备注
-   * @url /batch/{batchId}/remark
-   * @method POST
-   * @param {number} batchId 
-   * @param {Object} params Query parameters
-   * @param {string} params.remark 
-   * @returns {Promise<any>}
-   */
-  updateBatchRemark(batchId, params = {}) {
-    return request({
-      url: `/batch/${batchId}/remark`,
-      method: 'POST',
-      params
-    })
-  },
-
-  /**
-   * @description 启用批次
-   * @url /batch/{batchId}/enable
-   * @method POST
-   * @param {number} batchId 
-   * @returns {Promise<any>}
-   */
-  enableBatch(batchId) {
-    return request({
-      url: `/batch/${batchId}/enable`,
-      method: 'POST'
-    })
-  },
-
-  /**
-   * @description 禁用批次
-   * @url /batch/{batchId}/disable
-   * @method POST
-   * @param {number} batchId 
-   * @returns {Promise<any>}
-   */
-  disableBatch(batchId) {
-    return request({
-      url: `/batch/${batchId}/disable`,
-      method: 'POST'
-    })
-  },
-
-  /**
    * @description 查询批次列表
    * @url /batch/list
    * @method POST

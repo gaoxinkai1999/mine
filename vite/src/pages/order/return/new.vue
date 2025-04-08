@@ -67,7 +67,6 @@ import CartBar from './components/CartBar.vue'
 import CartPopup from './components/CartPopup.vue'
 import { onMounted, onBeforeUnmount } from 'vue'
 import { showConfirmDialog } from 'vant'
-import { ROUTE_NAMES } from '@/constants/routeNames'
 
 const router = useRouter()
 const store = useReturnOrderStore()

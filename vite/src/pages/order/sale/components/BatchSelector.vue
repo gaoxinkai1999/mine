@@ -46,7 +46,6 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { showToast } from 'vant';
 
 const props = defineProps({
   visible: {

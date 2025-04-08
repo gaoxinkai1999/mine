@@ -167,17 +167,9 @@ export default {
 .statistics-dashboard {
   padding: 16px;
   background-color: #f5f7fa;
-  min-height: 100vh;
+  height: 100%;
   position: relative;
   box-sizing: border-box;
-  overflow-y: auto;
-  padding-bottom: var(--van-tabbar-height);
-}
-
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .statistics-dashboard {
-    padding-bottom: calc(var(--van-tabbar-height) + env(safe-area-inset-bottom, 0px));
-  }
 }
 
 .stats-groups {

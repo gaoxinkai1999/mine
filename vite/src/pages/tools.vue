@@ -55,13 +55,11 @@ export default {
 <style scoped>
 .my-tools {
   padding: 16px;
-  padding-bottom: calc(16px + var(--van-tabbar-height)); /* 添加底部padding以避免内容被遮挡 */
   background-color: #f5f7fa;
-  min-height: 100vh;
+  height: 100%;
   width: 100%;
   box-sizing: border-box;
-  position: relative; /* 改为相对定位 */
-  overflow-y: auto;
+  position: relative;
 }
 
 .page-title {
@@ -96,13 +94,6 @@ export default {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* 适配iOS安全区 */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .my-tools {
-    padding-bottom: calc(16px + var(--van-tabbar-height) + env(safe-area-inset-bottom, 0px));
-  }
-}
-
 @media (max-width: 600px) {
   .tool-groups {
     grid-template-columns: 1fr;
@@ -110,18 +101,10 @@ export default {
   
   .my-tools {
     padding: 12px;
-    padding-bottom: calc(12px + var(--van-tabbar-height)); /* 小屏幕底部padding */
   }
   
   .page-title {
     font-size: 18px;
-  }
-  
-  /* 小屏幕iOS安全区适配 */
-  @supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .my-tools {
-      padding-bottom: calc(12px + var(--van-tabbar-height) + env(safe-area-inset-bottom, 0px));
-    }
   }
 }
 </style>

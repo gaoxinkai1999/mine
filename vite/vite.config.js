@@ -6,7 +6,6 @@ import AutoImport from 'unplugin-auto-import/vite';
 import Components from 'unplugin-vue-components/vite';
 import {VantResolver} from '@vant/auto-import-resolver';
 import {ElementPlusResolver} from 'unplugin-vue-components/resolvers'
-import fs from 'fs';
 
 export default defineConfig({
     plugins: [vue(),

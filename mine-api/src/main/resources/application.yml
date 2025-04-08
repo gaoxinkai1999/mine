@@ -55,9 +55,9 @@ springdoc:
 
 
 #
-logging:
-  level:
-    com.example: debug
+#logging:
+#  level:
+#    com.example: debug
 
 #management:
 #  endpoints:

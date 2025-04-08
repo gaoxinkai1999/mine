@@ -148,64 +148,99 @@ export default {
 
 </script>
 
-<style> .van-index-bar__sidebar {
-  width: 40px !important;
-  font-size: 16px !important;
-  font-weight: 500 !important;
-  right: 0 !important; /* 减小最大高度 */
-  max-height: 400px !important;
-  overflow-y: auto !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  position: fixed !important; /* 确保垂直居中 */
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  border-radius: 20px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-  padding: 4px 0 !important;
-  z-index: 100 !important; /* 压缩字母间距 */
-  letter-spacing: 0 !important;
+<style scoped>
+/* 使用深度选择器正确覆盖 Vant 组件样式 */
+:deep(.van-search) {
+  border-radius: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.van-index-bar__sidebar::-webkit-scrollbar {
-  width: 0 !important;
-  display: none !important;
+:deep(.van-cell) {
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin: 4px 0;
+  transition: background-color 0.2s;
 }
 
-.van-index-bar__index {
-  font-size: 15px !important;
-  padding: 2px 0 !important;
-  line-height: 1.1 !important;
-  touch-action: manipulation !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
-  font-weight: 600 !important;
+:deep(.van-cell:active) {
+  background-color: #f8f8f8;
 }
 
-.van-index-bar__index:active {
-  background-color: #f5f5f5 !important;
-  transform: scale(1.1) !important;
+:deep(.van-cell__title) {
+  font-weight: 500;
 }
 
-.van-index-anchor {
-  font-size: 16px !important;
-  font-weight: 600 !important;
-  padding: 8px 16px !important;
+:deep(.van-cell__label) {
+  color: #909399;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* 索引栏样式优化 */
+:deep(.van-index-bar__sidebar) {
+  width: 25px;
+  font-size: 12px;
+  right: 5px;
+  max-height: 70vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 8px 0;
+  z-index: 100;
+}
+
+:deep(.van-index-bar__index) {
+  padding: 4px 0;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s;
+}
+
+:deep(.van-index-bar__index--active) {
+  color: #1989fa;
+  font-weight: 700;
+  transform: scale(1.2);
+}
+
+:deep(.van-index-anchor) {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 16px;
+  background-color: #f5f7fa;
+  color: #323233;
+  border-left: 3px solid #1989fa;
+  margin: 5px 0;
 }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
-  .van-index-bar__sidebar {
-    width: 35px !important;
-    font-size: 14px !important; /* 移动端进一步减小高度 */
-    max-height: 350px !important;
+  :deep(.van-index-bar__sidebar) {
+    width: 20px;
+    right: 2px;
+    max-height: 60vh;
   }
-
-  .van-index-bar__index {
-    padding: 2px 0 !important;
-    font-size: 14px !important;
+  
+  :deep(.van-index-bar__index) {
+    font-size: 10px;
+    padding: 3px 0;
   }
-}</style>
+  
+  :deep(.van-cell__title span) {
+    font-size: 14px;
+  }
+  
+  :deep(.van-cell__label) {
+    font-size: 11px;
+  }
+}
+</style>

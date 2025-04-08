@@ -84,7 +84,6 @@ import {ref, reactive, onMounted} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {showToast, showFailToast} from 'vant'
 import productOrderApi from '@/api/productOrder'
-import productApi from '@/api/product'
 
 // 页面状态
 const loading = ref(false)

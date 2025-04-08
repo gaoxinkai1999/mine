@@ -50,12 +50,19 @@
           <template v-else>
             <draggable
               v-model="currentFoods"
-              :animation="300"
-              :delay="50"
+              :animation="150"
+              :delay="0"
               :force-fallback="true"
               :touch-start-threshold="5"
               :handle="'.drag-handle'"
               item-key="id"
+              :disabled="false"
+              :throttle="16"
+              ghost-class="sortable-ghost"
+              chosen-class="sortable-chosen"
+              drag-class="sortable-drag"
+              :sort="true"
+              @start="dragStart"
               @end="onDragEnd"
             >
               <template #item="{ element }">
@@ -188,6 +195,7 @@ export default {
       isAdmin: true,
       touchStartTime: 0,
       isDragging: false,
+      draggedElement: null,
     };
   },
   computed: {
@@ -211,7 +219,6 @@ export default {
       this.newItem = this.getEmptyNewItem();
       this.isEdit = false;
       this.showAddPopup = true;
-
     },
     async getCategories() {
       try {
@@ -247,9 +254,29 @@ export default {
       this.newItem.categoryId = selected.id;
       this.showPicker = false;
     },
-    dragStart() {
+    dragStart(e) {
       this.isDragging = true;
+      this.draggedElement = e.item;
+      
+      // 开始拖拽时，让元素在硬件加速层上运行，提高性能
+      if (this.draggedElement) {
+        this.draggedElement.style.willChange = 'transform';
+        this.draggedElement.style.transform = 'translateZ(0)';
+      }
+      
+      // 添加CSS类避免过多重新计算布局
+      document.body.classList.add('dragging-active');
+      
+      // 禁用其他触摸事件，防止滚动冲突
+      document.addEventListener('touchmove', this.preventDefaultTouchMove, { passive: false });
     },
+    
+    preventDefaultTouchMove(e) {
+      if (this.isDragging) {
+        e.preventDefault();
+      }
+    },
+    
     handleTouchStart() {
       this.touchStartTime = Date.now();
     },
@@ -353,7 +380,23 @@ export default {
       }
       return true;
     },
-    async onDragEnd() {
+    async onDragEnd(evt) {
+      // 移除拖拽时添加的CSS类
+      document.body.classList.remove('dragging-active');
+      document.removeEventListener('touchmove', this.preventDefaultTouchMove);
+      
+      // 恢复拖拽元素的默认样式
+      if (this.draggedElement) {
+        this.draggedElement.style.willChange = 'auto';
+        this.draggedElement.style.transform = '';
+        this.draggedElement = null;
+      }
+      
+      this.isDragging = false;
+      
+      // 如果没有实际移动位置，不进行更新操作
+      if (evt.oldIndex === evt.newIndex) return;
+      
       try {
         await api.product.batchUpdate(
           this.currentFoods.map((item, index) => ({
@@ -392,6 +435,10 @@ export default {
   },
   async mounted() {
     await this.init()
+  },
+  beforeUnmount() {
+    // 清理事件监听器
+    document.removeEventListener('touchmove', this.preventDefaultTouchMove);
   }
 };
 </script>
@@ -497,7 +544,8 @@ export default {
   margin-bottom: 12px;
   display: flex;
   border: 1px solid #ebedf0;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  will-change: transform;
+  transition: box-shadow 0.2s ease;
 }
 
 .drag-handle {
@@ -510,9 +558,12 @@ export default {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
-  transition: color 0.3s ease;
+  cursor: grab;
   font-size: 20px;
-  cursor: move;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .goods-content {
@@ -640,7 +691,11 @@ export default {
   opacity: 0.5;
   background: #f2f3f5;
   transform: scale(0.98);
-  transition: all 0.15s ease;
+  box-shadow: none !important;
+}
+
+.sortable-chosen {
+  background-color: #fff;
 }
 
 .sortable-drag {
@@ -648,7 +703,18 @@ export default {
   background: #fff;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
   transform: scale(1.02);
-  transition: all 0.15s ease;
+  z-index: 10;
+}
+
+:global(.dragging-active) {
+  cursor: grabbing !important;
+  user-select: none;
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
+
+:global(.dragging-active *) {
+  cursor: grabbing !important;
 }
 
 /* 表单字段样式优化 */
@@ -891,5 +957,13 @@ export default {
   .goods-item:active {
     background: rgba(0, 0, 0, 0.05);
   }
+}
+
+/* 添加硬件加速 */
+.sortable-drag, .sortable-ghost, .sortable-chosen {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
 }
 </style>

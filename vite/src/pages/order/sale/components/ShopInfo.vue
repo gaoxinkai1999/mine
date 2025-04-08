@@ -73,7 +73,7 @@
     <div class="history-orders-container">
       <Index
         ref="historyOrdersListRef"
-        :shop-id="currentShop?.id"
+        :shopId="currentShop?.id"
         :custom-mode="true"
       />
     </div>

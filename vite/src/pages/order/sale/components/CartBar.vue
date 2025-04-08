@@ -22,7 +22,6 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
 import { useOrderStore } from '@/stores/order';
 import {storeToRefs} from 'pinia';
 

@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 
@@ -41,6 +42,14 @@ public class StatisticsController {
     ) {
         return statisticsService.calculateDateRangeStatistics(startDate, endDate);
     }
+    @Operation(summary = "获取月度统计数据")
+    @GetMapping("/monthly")
+    public Map<YearMonth, SalesStatisticsDTO> getMonthlyStatistics(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ){
+        return statisticsService.calculateMonthlyStatisticsOptimized(startDate, endDate);
+    }
 
     @Operation(summary = "获取每日统计数据")
     @GetMapping("/daily")
@@ -59,7 +68,6 @@ public class StatisticsController {
         if (request.getProductIds() == null || request.getProductIds().length == 0) {
             throw new MyException("产品ID数组不能为空");
         }
-        System.out.println("xxxxx"+request);
         DataExtractor dataExtractor = switch (request.getExtractorType()) {
             case "Profit" -> new ProfitExtractor();
             case "Quantity" -> new QuantityExtractor();

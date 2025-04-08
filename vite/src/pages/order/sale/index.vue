@@ -199,7 +199,7 @@ export default {
       this.loading = true;
       try {
         const response = await api.order.getOrders({
-          shopId: this.orderListStore.filterParams.shopId,
+          shopId: this.shopId || this.orderListStore.filterParams.shopId,
           startDate: this.orderListStore.filterParams.startDate,
           endDate: this.orderListStore.filterParams.endDate,
           page: this.pageIndex,

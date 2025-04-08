@@ -74,11 +74,10 @@ elseif ($BuildType -eq "release") {
     Write-Host "Release APK已复制到项目根目录: ./$OutputApkName" -ForegroundColor Green
 }
 
-## 上传APK和版本信息到腾讯云COS
-#Write-Host "开始上传APK和版本信息到腾讯云COS..." -ForegroundColor Cyan
-## 此处已提前处理，无需重复删除
-#node upload-to-cos.cjs
-#Write-Host "上传完成" -ForegroundColor Green
+# 上传APK和版本信息到腾讯云COS
+Write-Host "开始上传APK和版本信息到腾讯云COS..." -ForegroundColor Cyan
+node upload-to-cos.cjs
+Write-Host "上传完成" -ForegroundColor Green
 
 
 # 构建完成后，恢复开发环境的 server.url 为固定地址
