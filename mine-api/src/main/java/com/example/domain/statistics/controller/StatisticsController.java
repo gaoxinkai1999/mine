@@ -63,22 +63,16 @@ public class StatisticsController {
     @Operation(summary = "获取产品移动平均线数据")
     @PostMapping("/products")
     public MovingAverageLineDTO getMovingAverage(
-            @RequestBody MovingAverageLineRequest request
+            @RequestBody MovingAverageLineRequest request,
+            @RequestParam LocalDate startDate, // 添加 startDate 参数
+            @RequestParam LocalDate endDate    // 添加 endDate 参数
     ) {
         if (request.getProductIds() == null || request.getProductIds().length == 0) {
             throw new MyException("产品ID数组不能为空");
         }
-        DataExtractor dataExtractor = switch (request.getExtractorType()) {
-            case "Profit" -> new ProfitExtractor();
-            case "Quantity" -> new QuantityExtractor();
-            case "SalesAmount" -> new SalesAmountExtractor();
-            default -> new ProfitExtractor();
-        };
-        return statisticsService.getMovingAverage(
-                request.getProductIds(),
-                dataExtractor,
-                request.getPeriod()
-        );
+        // 移除 DataExtractor 创建逻辑，现在由 Service 处理
+        // 直接调用更新后的 Service 方法
+        return statisticsService.getMovingAverage(request, startDate, endDate);
     }
 
     @Operation(summary = "获取总体趋势数据")

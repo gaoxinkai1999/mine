@@ -23,7 +23,7 @@ public class CategoryController {
             description = "")
     @GetMapping("/list")
     public List<Category> getCategories() {
-        return categoryService.findList(CategoryQuery.builder()
+        return categoryService.findList(CategoryQuery.builder().del(false)
                                                      .build());
     }
     /**
