@@ -6,44 +6,69 @@
 
 <template>
   <div class="custom-table-container">
-    <!-- 自定义表格 -->
     <div class="custom-table">
       <!-- 表头 -->
       <div class="table-header">
         <div class="header-cell index-cell">#</div>
         <div class="header-cell shop-cell">店铺</div>
-        <div class="header-cell sortable" @click="sortBy('totalSales')">
+        <div class="header-cell value-cell sortable" @click="sortBy('totalSales')">
           总销售额
           <span class="sort-icon" :class="getSortIconClass('totalSales')"></span>
         </div>
-        <div class="header-cell sortable" @click="sortBy('totalProfit')">
+        <div class="header-cell value-cell sortable" @click="sortBy('totalProfit')">
           总利润
           <span class="sort-icon" :class="getSortIconClass('totalProfit')"></span>
         </div>
-        <div class="header-cell sortable" @click="sortBy('averageMonthlyProfit')">
+        <div class="header-cell value-cell sortable" @click="sortBy('averageMonthlyProfit')">
           月平均利润
           <span class="sort-icon" :class="getSortIconClass('averageMonthlyProfit')"></span>
         </div>
+        <div class="header-cell expand-cell"></div>
       </div>
-      
-      <!-- 表格内容 -->
+
       <div class="table-body">
-        <div 
-          v-for="(row, index) in sortedShopData" 
-          :key="index"
-          class="table-row"
-          :class="getRowClass(row)"
-        >
-          <div class="table-cell index-cell">{{ index + 1 }}</div>
-          <div class="table-cell shop-cell">
-            <span class="shop-link" @click="handleClick(row.shopId)">{{ row.shopName }}</span>
+        <div v-for="(row, index) in sortedShopData" :key="index">
+          <!-- 商家主行 -->
+          <div
+            class="table-row"
+            :class="getRowClass(row)"
+          >
+            <div class="table-cell index-cell">{{ index + 1 }}</div>
+            <div class="table-cell shop-cell">
+              <span class="shop-link" @click="handleClick(row.shopId)">{{ row.shopName }}</span>
+            </div>
+            <div class="table-cell value-cell">{{ formatNumber(row.totalSales) }}</div>
+            <div class="table-cell value-cell">{{ formatNumber(row.totalProfit) }}</div>
+            <div class="table-cell value-cell">{{ formatNumber(row.averageMonthlyProfit) }}</div>
+            <div class="table-cell expand-cell">
+              <button class="expand-btn" @click="row.expanded = !row.expanded">
+                {{ row.expanded ? '收起' : '展开' }}
+              </button>
+            </div>
           </div>
-          <div class="table-cell">{{ formatNumber(row.totalSales) }}</div>
-          <div class="table-cell">{{ formatNumber(row.totalProfit) }}</div>
-          <div class="table-cell">{{ formatNumber(row.averageMonthlyProfit) }}</div>
+
+          <!-- 商品明细嵌套表 -->
+          <div v-if="row.expanded" class="product-detail">
+            <div class="product-header">
+              <div class="product-cell">商品名称</div>
+              <div class="product-cell">平均月销量</div>
+              <div class="product-cell">平均月销售额</div>
+              <div class="product-cell">平均月利润</div>
+            </div>
+            <div
+              v-for="(p, pi) in row.productMonthlySalesList"
+              :key="pi"
+              class="product-row"
+            >
+              <div class="product-cell">{{ p.productName }}</div>
+              <div class="product-cell">{{ p.quantity }}</div>
+              <div class="product-cell">{{ formatNumber(p.totalSales) }}</div>
+              <div class="product-cell">{{ formatNumber(p.totalProfit) }}</div>
+            </div>
+          </div>
         </div>
       </div>
-      
+
       <!-- 无数据提示 -->
       <div class="no-data" v-if="shopDataList.length === 0 && !loading">
         <p>暂无店铺数据</p>
@@ -176,12 +201,30 @@ export default {
   color: #606266;
   font-size: 14px;
   text-align: center;
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.expand-cell {
+  flex: 0 0 70px;
+}
+
+.expand-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #409eff;
+  background: #ecf5ff;
+  border: 1px solid #b3d8ff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.expand-btn:hover {
+  background: #d9ecff;
+}
+
+/* 排序箭头 */
 .sortable {
   cursor: pointer;
   transition: background-color 0.2s;
@@ -232,13 +275,27 @@ export default {
 .table-row:hover {
   background-color: #f5f7fa;
 }
-
-.table-row:last-child {
-  border-bottom: none;
-}
-
 .warning-row {
   background-color: rgba(245, 108, 108, 0.1);
+}
+
+/* 列宽控制，保证表头和行对齐 */
+.index-cell {
+  flex: 0 0 50px;
+}
+
+.shop-cell {
+  flex: 2;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.value-cell {
+  flex: 1;
+}
+
+.expand-cell {
+  flex: 0 0 70px;
 }
 
 .warning-row:hover {
@@ -249,7 +306,6 @@ export default {
   padding: 14px 12px;
   font-size: 14px;
   text-align: center;
-  flex: 1;
 }
 
 /* 特殊列样式 */
@@ -273,6 +329,31 @@ export default {
 .shop-link:hover {
   color: #6366f1;
   text-decoration: underline;
+}
+
+/* 商品明细嵌套表 */
+.product-detail {
+  background: #fafbfc;
+  padding: 10px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.product-header,
+.product-row {
+  display: flex;
+}
+
+.product-header {
+  border-bottom: 1px solid #dfe4ed;
+  font-weight: bold;
+  background: #f3f4f7;
+}
+
+.product-cell {
+  flex: 1;
+  padding: 8px 6px;
+  font-size: 13px;
+  text-align: center;
 }
 
 /* 无数据状态 */

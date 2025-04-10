@@ -66,23 +66,125 @@ public class StatisticsService {
      * @return List<ShopStatisticsDTO> 包含所有商家统计结果的列表
      */
     public List<ShopStatisticsDTO> calculateShopStatistics() {
-        ShopQuery shopQuery = ShopQuery.builder()
-                                       .del(false)
-                                       .build();
+        // 查询全部未删除商家
+        List<Shop> shops = shopService.findList(ShopQuery.builder().del(false).build());
+        Map<Integer, Shop> shopMap = shops.stream()
+                .collect(Collectors.toMap(Shop::getId, Function.identity()));
 
-        List<Shop> shops = shopService.findList(shopQuery);
+        Map<Integer, ShopStatisticsDTO> shopStats = getShopAggregateStatistics(shopMap);
+        Map<Integer, List<ProductSalesInfoDTO>> productStats = getShopProductMonthlyStatistics(shopMap);
 
-        OrderQuery orderQuery = OrderQuery.builder()
-                                          .includes(OrderQuery.Include.WITH_SHOP)
-                                          .build();
+        for (Map.Entry<Integer, ShopStatisticsDTO> entry : shopStats.entrySet()) {
+            int shopId = entry.getKey();
+            ShopStatisticsDTO dto = entry.getValue();
+            dto.setProductMonthlySalesList(productStats.getOrDefault(shopId, Collections.emptyList()));
+        }
+        return new ArrayList<>(shopStats.values());
+    }
 
-        // 获取所有订单
-        List<Order> orders = orderService.findList(orderQuery);
+    /**
+     * 查询每个商家的总销售额、总利润，并计算平均月利润
+     */
+    private Map<Integer, ShopStatisticsDTO> getShopAggregateStatistics(Map<Integer, Shop> shopMap) {
+        QOrder qOrder = QOrder.order;
 
-        // 对每个商家计算统计结果
-        return shops.stream()
-                    .map(shop -> calculateStatisticsForShop(shop, orders))
-                    .collect(Collectors.toList());
+        List<Tuple> results = queryFactory
+            .select(
+                qOrder.shop.id,
+                qOrder.totalSalesAmount.sum().coalesce(BigDecimal.ZERO),
+                qOrder.totalProfit.sum().coalesce(BigDecimal.ZERO)
+            )
+            .from(qOrder)
+            .groupBy(qOrder.shop.id)
+            .fetch();
+
+        Map<Integer, ShopStatisticsDTO> map = new HashMap<>();
+        for (Tuple t : results) {
+            Integer shopId = t.get(0, Integer.class);
+            if (!shopMap.containsKey(shopId)) continue;
+
+            BigDecimal totalSales = t.get(1, BigDecimal.class);
+            BigDecimal totalProfit = t.get(2, BigDecimal.class);
+
+            Shop shop = shopMap.get(shopId);
+            long days = ChronoUnit.DAYS.between(shop.getCreateTime(), LocalDate.now());
+            BigDecimal months = days > 0 ? BigDecimal.valueOf(days).divide(BigDecimal.valueOf(30), 4, RoundingMode.HALF_UP) : BigDecimal.ONE;
+
+            ShopStatisticsDTO dto = new ShopStatisticsDTO();
+            dto.setShopId(shopId);
+            dto.setShopName(shop.getName());
+            dto.setTotalSales(totalSales);
+            dto.setTotalProfit(totalProfit);
+            dto.setAverageMonthlyProfit(
+                months.compareTo(BigDecimal.ZERO) > 0 ?
+                totalProfit.divide(months, 2, RoundingMode.HALF_UP) :
+                BigDecimal.ZERO
+            );
+            map.put(shopId, dto);
+        }
+        return map;
+    }
+
+    /**
+     * 查询每个商家下每个商品的总销量、销售额、利润，并按上线天数计算平均月数据
+     */
+    private Map<Integer, List<ProductSalesInfoDTO>> getShopProductMonthlyStatistics(Map<Integer, Shop> shopMap) {
+        QOrder qOrder = QOrder.order;
+        QOrderDetail qOrderDetail = QOrderDetail.orderDetail;
+        QProduct qProduct = QProduct.product;
+
+        List<Tuple> results = queryFactory
+            .select(
+                qOrder.shop.id,
+                qOrderDetail.product.id,
+                qProduct.name,
+                qOrderDetail.quantity.sum().coalesce(0),
+                qOrderDetail.totalSalesAmount.sum().coalesce(BigDecimal.ZERO),
+                qOrderDetail.totalProfit.sum().coalesce(BigDecimal.ZERO)
+            )
+            .from(qOrderDetail)
+            .join(qOrderDetail.order, qOrder)
+            .join(qOrderDetail.product, qProduct)
+            .groupBy(qOrder.shop.id, qOrderDetail.product.id, qProduct.name)
+            .fetch();
+
+        Map<Integer, List<ProductSalesInfoDTO>> resultMap = new HashMap<>();
+        for (Tuple t : results) {
+            Integer shopId = t.get(0, Integer.class);
+            if (!shopMap.containsKey(shopId)) continue;
+
+            Integer productId = t.get(1, Integer.class);
+            String productName = t.get(2, String.class);
+            Integer totalQuantity = t.get(3, Integer.class);
+            BigDecimal totalSales = t.get(4, BigDecimal.class);
+            BigDecimal totalProfit = t.get(5, BigDecimal.class);
+
+            Shop shop = shopMap.get(shopId);
+            long days = ChronoUnit.DAYS.between(shop.getCreateTime(), LocalDate.now());
+            BigDecimal months = days > 0 ? BigDecimal.valueOf(days).divide(BigDecimal.valueOf(30), 4, RoundingMode.HALF_UP) : BigDecimal.ONE;
+
+            ProductSalesInfoDTO dto = new ProductSalesInfoDTO();
+            dto.setProductId(productId);
+            dto.setProductName(productName);
+            dto.setQuantity(
+                months.compareTo(BigDecimal.ZERO) > 0 ?
+                BigDecimal.valueOf(totalQuantity).divide(months, 0, RoundingMode.HALF_UP).intValue() :
+                0
+            );
+            dto.setTotalSales(
+                months.compareTo(BigDecimal.ZERO) > 0 ?
+                totalSales.divide(months, 2, RoundingMode.HALF_UP) :
+                BigDecimal.ZERO
+            );
+            dto.setTotalProfit(
+                months.compareTo(BigDecimal.ZERO) > 0 ?
+                totalProfit.divide(months, 2, RoundingMode.HALF_UP) :
+                BigDecimal.ZERO
+            );
+
+            resultMap.computeIfAbsent(shopId, k -> new ArrayList<>()).add(dto);
+        }
+        return resultMap;
     }
 
 

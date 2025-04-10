@@ -442,11 +442,8 @@ const getTotalQuantity = () => {
 // 计算总金额
 const getTotalAmount = () => {
   return processedTableData.value.reduce((sum, row) => {
-    // 只计算无子项的行或总计行
-    if (!row.children) {
-      return sum + (Number(row.amount) || 0);
-    }
-    return sum;
+    // 计算所有行的金额，无论是否有子项
+    return sum + (Number(row.amount) || 0);
   }, 0);
 };
 

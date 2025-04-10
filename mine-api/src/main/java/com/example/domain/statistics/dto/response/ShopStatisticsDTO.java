@@ -17,4 +17,5 @@ public class ShopStatisticsDTO {
     private BigDecimal totalSales; // 总销售额
     private BigDecimal totalProfit; // 总利润
     private BigDecimal averageMonthlyProfit; // 平均月利润
+    private java.util.List<ProductSalesInfoDTO> productMonthlySalesList; // 每个商家下所有商品的平均月销售数据
 }
