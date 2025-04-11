@@ -26,13 +26,9 @@ public class CategoryController {
         return categoryService.findList(CategoryQuery.builder().del(false)
                                                      .build());
     }
-    //AI!
-    /**
-     * 软删除品类
-     * @param categoryId
-     */
-    @PostMapping("/deleteCategory")
-    public void deleteCategory(@RequestParam Integer categoryId) {
+    @Operation(summary = "软删除品类", description = "通过品类ID进行软删除操作")
+    @DeleteMapping("/{categoryId}")
+    public void deleteCategory(@PathVariable Integer categoryId) {
         categoryService.deleteCategory(categoryId);
     }
     @Operation(summary = "新建品类",
