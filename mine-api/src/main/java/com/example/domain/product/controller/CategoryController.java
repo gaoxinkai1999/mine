@@ -26,6 +26,7 @@ public class CategoryController {
         return categoryService.findList(CategoryQuery.builder().del(false)
                                                      .build());
     }
+    //AI!
     /**
      * 软删除品类
      * @param categoryId
