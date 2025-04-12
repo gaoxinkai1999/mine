@@ -1,6 +1,6 @@
 {
   "changelog": "\n\n修复部分问题",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "url": "http://update.abocidee.com/updates/dist.zip",
   "forceDownloadApk": true,
   "apkUrl": "https://cdn.abocidee.com/app-release.apk"

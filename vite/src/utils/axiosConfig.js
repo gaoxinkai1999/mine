@@ -2,10 +2,12 @@ import axios from 'axios';
 import {showFailToast} from 'vant'; // 替换成你实际使用的 Toast 组件
 // import { Loading } from 'element-ui'; // 如果需要 loading 功能，可以引入对应组件
 
+// 根据环境变量选择 baseURL
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.102:8085/api';
+
 // 创建 axios 实例
 const instance = axios.create({
-    // baseURL: 'https://new.abocidee.com/api',
-    baseURL: 'http://192.168.0.102:8085/api',// 替换为你的后端 API 根路径
+    baseURL: BASE_URL, // 使用环境变量中的 API URL
     timeout: 5000, // 请求超时时间
 });
 
