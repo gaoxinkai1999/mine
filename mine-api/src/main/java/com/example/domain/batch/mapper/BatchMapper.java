@@ -16,10 +16,6 @@ public abstract class BatchMapper {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     public abstract Batch partialUpdate(BatchUpdateDto batchUpdateDto, @MappingTarget Batch batch);
 
-    @AfterMapping
-    protected void afterPartialUpdate(BatchUpdateDto batchUpdateDto, @MappingTarget Batch batch) {
-        if (batchUpdateDto.getProductId() != null) {
-            batch.setProduct(productRepository.getReferenceById(batchUpdateDto.getProductId()));
-        }
-    }
-} 
+    // Removed afterPartialUpdate method as productId is no longer part of the DTO
+    // and updating batch info should not change the associated product via the mapper.
+}
