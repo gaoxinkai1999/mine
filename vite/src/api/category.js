@@ -17,22 +17,6 @@ const api = {
   },
 
   /**
-   * @description 
-   * @url /category/deleteCategory
-   * @method POST
-   * @param {Object} params Query parameters
-   * @param {number} params.categoryId 
-   * @returns {Promise<any>}
-   */
-  deleteCategory(params = {}) {
-    return request({
-      url: '/category/deleteCategory',
-      method: 'POST',
-      params
-    })
-  },
-
-  /**
    * @description 新建品类
    * @url /category/create
    * @method POST
@@ -73,6 +57,20 @@ const api = {
     return request({
       url: '/category/list',
       method: 'GET'
+    })
+  },
+
+  /**
+   * @description 软删除品类
+   * @url /category/{categoryId}
+   * @method DELETE
+   * @param {number} categoryId 
+   * @returns {Promise<any>}
+   */
+  deleteCategory(categoryId) {
+    return request({
+      url: `/category/${categoryId}`,
+      method: 'DELETE'
     })
   }
 }

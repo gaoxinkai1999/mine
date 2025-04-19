@@ -44,8 +44,13 @@ $FULL_IMAGE_TAG = "${REGISTRY_URL}/${NAMESPACE}/${IMAGE_NAME}:${VERSION}"
 
 Write-Host "==== Step 1: 清除并构建后端 Jar 包 ===="
 try {
-    & .\mine-api\mvnw clean package -DskipTests
-    if ($LASTEXITCODE -ne 0) { throw "Maven 构建失败" }
+    Push-Location mine-api
+    & .\mvnw.cmd clean package -DskipTests
+    if ($LASTEXITCODE -ne 0) {
+        Pop-Location
+        throw "Maven 构建失败"
+    }
+    Pop-Location
     Write-Host "后端 Jar 包构建完成" -ForegroundColor Green
 } catch {
     Write-Host "错误：Maven 构建失败 - $_" -ForegroundColor Red
@@ -182,7 +187,7 @@ $BuildType = "release"
 # 前端构建
 Write-Host "正在构建前端代码..." -ForegroundColor Cyan
 try {
-    npm run build -- --mode production
+    npm run build:prod
     if ($LASTEXITCODE -ne 0) { throw "npm build failed" }
 }
 catch {

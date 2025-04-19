@@ -2,7 +2,9 @@ package com.example.domain.order.service;
 
 import com.example.domain.batch.entity.Batch;
 import com.example.domain.batch.service.BatchService;
+import com.example.domain.inventory.dto.OperationType; // 添加 OperationType 导入
 import com.example.domain.inventory.service.InventoryService;
+import com.example.domain.inventory.service.InventoryTransactionService; // 添加 InventoryTransactionService 导入
 import com.example.domain.order.dto.OrderCreateRequest;
 import com.example.domain.order.entity.*;
 import com.example.domain.order.repository.OrderRepository;
@@ -53,6 +55,9 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
     private JPAQueryFactory queryFactory; // JPA查询工厂
     @Autowired
     private ShopService shopService;
+
+    @Autowired
+    private InventoryTransactionService inventoryTransactionService; // 注入库存交易服务
 
 
     /**
@@ -201,6 +206,8 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                         );
                         // 扣减库存
                         inventoryService.stockOut(product, allocation.getBatch(), allocation.getQuantity());
+                        // 记录库存流水 (销售出库)
+                        inventoryTransactionService.recordTransactionForSales(product, allocation.getBatch(), -allocation.getQuantity(), OperationType.销售出库, order);
                     }
                 } else {
                     // 如果指定了批次信息，按指定批次处理
@@ -212,12 +219,17 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                                                   .orElseThrow(() -> new MyException("批次不存在: " + batchDetail.getBatchNumber()));
 
                         orderDetail.addBatchDetail(batch, batchDetail.getQuantity(), requestedPrice);
+                        // 扣减库存
                         inventoryService.stockOut(product, batch, batchDetail.getQuantity());
+                        // 记录库存流水 (销售出库)
+                        inventoryTransactionService.recordTransactionForSales(product, batch, -batchDetail.getQuantity(), OperationType.销售出库, order);
                     }
                 }
             } else {
-                // 非批次商品直接扣减库存
-                inventoryService.stockOut(product, itemRequest.getQuantity());
+               // 非批次商品直接扣减库存
+               inventoryService.stockOut(product, itemRequest.getQuantity());
+               // 记录库存流水 (销售出库)
+               inventoryTransactionService.recordTransactionForSales(product, null, -itemRequest.getQuantity(), OperationType.销售出库, order);
             }
         }
 
@@ -248,6 +260,8 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                             batchDetail.getBatch(),
                             batchDetail.getQuantity()
                     );
+                    // 记录库存流水 (取消销售订单)
+                    inventoryTransactionService.recordTransactionForSales(product, batchDetail.getBatch(), batchDetail.getQuantity(), OperationType.取消销售订单, order);
                 }
             } else {
                 // 对于非批次商品，直接入库
@@ -255,6 +269,8 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                         product,
                         orderDetail.getQuantity()
                 );
+                // 记录库存流水 (取消销售订单)
+                inventoryTransactionService.recordTransactionForSales(product, null, orderDetail.getQuantity(), OperationType.取消销售订单, order);
             }
         }
 

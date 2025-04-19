@@ -5,7 +5,9 @@ import com.example.domain.batch.entity.QBatch;
 import com.example.domain.batch.service.BatchService;
 import com.example.domain.forecast.service.ForecastService;
 import com.example.domain.inventory.entity.Inventory;
+import com.example.domain.inventory.dto.OperationType; // 添加 OperationType 导入
 import com.example.domain.inventory.service.InventoryService;
+import com.example.domain.inventory.service.InventoryTransactionService; // 添加 InventoryTransactionService 导入
 import com.example.domain.product.dto.ProductDto;
 import com.example.domain.product.entity.Product;
 import com.example.domain.product.entity.QProduct;
@@ -70,6 +72,9 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
 
     @Autowired
     private PurchaseMapper purchaseMapper; // 采购映射器，用于对象转换
+
+    @Autowired
+    private InventoryTransactionService inventoryTransactionService; // 注入库存交易服务
 
     /**
      * 根据查询条件构建基本条件查询
@@ -410,9 +415,13 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
                 
                 // 入库
                 inventoryService.stockIn(product, batch, detail.getQuantity());
+                // 记录库存流水
+                inventoryTransactionService.recordTransactionForPurchase(product, batch, detail.getQuantity(), OperationType.采购入库, purchase);
             } else {
                 // 非批次管理的商品直接入库
                 inventoryService.stockIn(product, detail.getQuantity());
+                // 记录库存流水
+                inventoryTransactionService.recordTransactionForPurchase(product, null, detail.getQuantity(), OperationType.采购入库, purchase);
             }
         }
 

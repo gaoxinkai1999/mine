@@ -27,7 +27,17 @@ public class InventoryTransactionQuery implements BaseQuery {
     /**
      * 订单ID
      */
-    private Integer orderId;
+    private Integer orderId; // 销售订单ID
+
+    /**
+     * 采购订单ID
+     */
+    private Integer purchaseId;
+
+    /**
+     * 退货订单ID
+     */
+    private Integer returnOrderId;
 
     /**
      * 操作类型
@@ -67,6 +77,16 @@ public class InventoryTransactionQuery implements BaseQuery {
         /**
          * 包含订单信息
          */
-        ORDER
+        ORDER, // 销售订单
+
+        /**
+         * 包含采购订单信息
+         */
+        PURCHASE,
+
+        /**
+         * 包含退货订单信息
+         */
+        RETURN_ORDER
     }
-} 
+}

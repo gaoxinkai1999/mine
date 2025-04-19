@@ -5,13 +5,17 @@ const api = {
    * @description 获取产品移动平均线数据
    * @url /statistics/products
    * @method POST
+   * @param {Object} params Query parameters
+   * @param {string} params.startDate 
+   * @param {string} params.endDate 
    * @param {Object} data Request body
    * @returns {Promise<any>}
    */
-  getMovingAverage(data) {
+  getMovingAverage(params = {}, data) {
     return request({
       url: '/statistics/products',
       method: 'POST',
+      params,
       data
     })
   },

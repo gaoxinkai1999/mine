@@ -1,6 +1,7 @@
 package com.example.domain.shop.service;
 
 
+import com.example.domain.order.entity.QOrder;
 import com.example.domain.product.entity.QProduct;
 import com.example.domain.shop.dto.ShopArrearsDto;
 import com.example.domain.shop.dto.ShopDto;
@@ -15,6 +16,7 @@ import com.example.query.ShopQuery;
 import com.example.utils.ChinesePinyinFirstLetter;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -146,6 +149,7 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
 
     /**
      * 新建店铺
+     *
      * @param shop
      */
     public void create(ShopDto shop) {
@@ -158,4 +162,90 @@ public class ShopService implements BaseRepository<Shop, ShopQuery> {
         shopRepository.save(shopEntity);
 
     }
+
+    // --- 使用 QueryDSL 实现的新查询方法 ---
+
+    /**
+     * 使用 QueryDSL 查询过去指定天数内活跃的、且未删除的商家列表 (无分页)。
+     * “活跃”定义为在指定天数内有过订单记录。
+     *
+     * @param daysThreshold 活跃天数阈值 (例如 90)
+     * @return 活跃商家实体列表 (List<Shop>)
+     */
+    public List<Shop> findActiveShopsQueryDSL(int daysThreshold) {
+        QOrder order = QOrder.order; // 获取订单实体的 Q 类实例
+        // 计算截止日期时间点（例如：90天前的 00:00:00）
+        LocalDateTime cutoffDateTime = LocalDate.now()
+                                                .minusDays(daysThreshold)
+                                                .atStartOfDay();
+
+        log.debug("使用 QueryDSL 查询近 {} 天活跃商家...", daysThreshold);
+
+
+        List<Shop> activeShops = queryFactory
+                .selectFrom(shop) // SELECT * FROM shop s
+                .where(
+                        shop.del.isFalse() // WHERE s.is_del = false
+                                .and( // AND
+                                        // 使用 EXISTS 子查询判断是否存在符合条件的订单
+                                        JPAExpressions
+                                                .selectOne() // SELECT 1
+                                                .from(order) // FROM `order` o
+                                                .where(
+                                                        order.shop.id.eq(shop.id) // WHERE o.shop_id = s.id
+                                                                     .and(order.createTime.goe(cutoffDateTime)) // AND o.create_time >= cutoffDateTime
+                                                )
+                                                .exists() // EXISTS (...)
+                                )
+                )
+                // 与默认查询保持一致的排序
+                .orderBy(shop.pinyin.asc(), shop.createTime.desc())
+                .fetch(); // 执行查询并获取结果列表
+
+        log.info("QueryDSL 查询到 {} 个近 {} 天活跃的商家。", activeShops.size(), daysThreshold);
+        return activeShops;
+
+    }
+
+    /**
+     * 使用 QueryDSL 查询在过去指定天数内不活跃的、但未删除的商家列表 (无分页)。
+     * “不活跃”定义为在指定天数内没有任何订单记录。
+     *
+     * @param daysThreshold 不活跃天数阈值 (例如 90)
+     * @return 不活跃商家实体列表 (List<Shop>)
+     */
+
+    public List<Shop> findInactiveShopsQueryDSL(int daysThreshold) {
+        QOrder order = QOrder.order;
+        LocalDateTime cutoffDateTime = LocalDate.now()
+                                                .minusDays(daysThreshold)
+                                                .atStartOfDay();
+
+        log.debug("使用 QueryDSL 查询近 {} 天不活跃商家...", daysThreshold);
+
+        List<Shop> inactiveShops = queryFactory
+                .selectFrom(shop) // SELECT * FROM shop s
+                .where(
+                        shop.del.isFalse() // WHERE s.is_del = false
+                                .and( // AND
+                                        // 使用 NOT EXISTS 子查询判断是否不存在符合条件的订单
+                                        JPAExpressions
+                                                .selectOne() // SELECT 1
+                                                .from(order) // FROM `order` o
+                                                .where(
+                                                        order.shop.id.eq(shop.id) // WHERE o.shop_id = s.id
+                                                                     .and(order.createTime.goe(cutoffDateTime)) // AND o.create_time >= cutoffDateTime
+                                                )
+                                                .notExists() // NOT EXISTS (...)
+                                )
+                )
+                // 与默认查询保持一致的排序
+                .orderBy(shop.pinyin.asc(), shop.createTime.desc())
+                .fetch(); // 执行查询
+
+        log.info("QueryDSL 查询到 {} 个近 {} 天不活跃的商家。", inactiveShops.size(), daysThreshold);
+        return inactiveShops;
+
+    }
+
 }

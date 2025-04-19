@@ -160,4 +160,19 @@ public class ShopController {
                     .toList();
     }
 
+    // 在 ShopController 中
+    @GetMapping("/active-shops")
+    public List<ShopDto> getActiveShops(@RequestParam(defaultValue = "90") int days) {
+        List<Shop> shops = shopService.findActiveShopsQueryDSL(days);
+        // 注意：原生SQL查询返回的是实体，如果需要DTO，还需要映射
+        return shops.stream().map(shopMapper::toShopDto).collect(Collectors.toList());
+    }
+
+    @GetMapping("/inactive-shops")
+    public List<ShopDto> getInactiveShops(@RequestParam(defaultValue = "90") int days) {
+        List<Shop> shops = shopService.findInactiveShopsQueryDSL(days);
+        return shops.stream().map(shopMapper::toShopDto).collect(Collectors.toList());
+    }
+
+
 }

@@ -76,6 +76,22 @@ const api = {
   },
 
   /**
+   * @description 
+   * @url /shop/inactive-shops
+   * @method GET
+   * @param {Object} params Query parameters
+   * @param {number} params.days 
+   * @returns {Promise<any>}
+   */
+  getInactiveShops(params = {}) {
+    return request({
+      url: '/shop/inactive-shops',
+      method: 'GET',
+      params
+    })
+  },
+
+  /**
    * @description 按拼音分组门店
    * @url /shop/group-by-pinyin
    * @method GET
@@ -116,6 +132,22 @@ const api = {
     return request({
       url: '/shop/arrears',
       method: 'GET'
+    })
+  },
+
+  /**
+   * @description 
+   * @url /shop/active-shops
+   * @method GET
+   * @param {Object} params Query parameters
+   * @param {number} params.days 
+   * @returns {Promise<any>}
+   */
+  getActiveShops(params = {}) {
+    return request({
+      url: '/shop/active-shops',
+      method: 'GET',
+      params
     })
   }
 }

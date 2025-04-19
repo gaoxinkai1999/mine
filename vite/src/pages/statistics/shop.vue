@@ -11,6 +11,10 @@
       <div class="table-header">
         <div class="header-cell index-cell">#</div>
         <div class="header-cell shop-cell">店铺</div>
+        <div class="header-cell value-cell sortable" @click="sortBy('arrears')">
+          欠款
+          <span class="sort-icon" :class="getSortIconClass('arrears')"></span>
+        </div>
         <div class="header-cell value-cell sortable" @click="sortBy('totalSales')">
           总销售额
           <span class="sort-icon" :class="getSortIconClass('totalSales')"></span>
@@ -37,6 +41,7 @@
             <div class="table-cell shop-cell">
               <span class="shop-link" @click="handleClick(row.shopId)">{{ row.shopName }}</span>
             </div>
+            <div class="table-cell value-cell">{{ formatNumber(row.arrears) }}</div>
             <div class="table-cell value-cell">{{ formatNumber(row.totalSales) }}</div>
             <div class="table-cell value-cell">{{ formatNumber(row.totalProfit) }}</div>
             <div class="table-cell value-cell">{{ formatNumber(row.averageMonthlyProfit) }}</div>

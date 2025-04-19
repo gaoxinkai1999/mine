@@ -7,7 +7,6 @@ import com.example.domain.shop.entity.Shop;
 import com.example.domain.shop.service.ShopService;
 import com.example.domain.statistics.dto.response.ProductSalesInfoDTO;
 import com.example.domain.statistics.dto.response.ShopStatisticsDTO;
-import com.example.query.ShopQuery;
 import com.querydsl.core.Tuple;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +38,7 @@ public class ShopStatisticsService {
      */
     public List<ShopStatisticsDTO> calculateShopStatistics() {
         // 查询全部未删除商家
-        List<Shop> shops = shopService.findList(ShopQuery.builder().del(false).build());
+        List<Shop> shops = shopService.findActiveShopsQueryDSL(90);
         Map<Integer, Shop> shopMap = shops.stream()
                 .collect(Collectors.toMap(Shop::getId, Function.identity()));
 
@@ -57,6 +56,8 @@ public class ShopStatisticsService {
                 ShopStatisticsDTO dto = new ShopStatisticsDTO();
                 dto.setShopId(id);
                 dto.setShopName(shop.getName());
+                dto.setLocation(shop.getLocation());
+                dto.setArrears(shop.getArrears());
                 dto.setTotalSales(BigDecimal.ZERO);
                 dto.setTotalProfit(BigDecimal.ZERO);
                 dto.setAverageMonthlyProfit(BigDecimal.ZERO);
@@ -106,6 +107,8 @@ public class ShopStatisticsService {
             ShopStatisticsDTO dto = new ShopStatisticsDTO();
             dto.setShopId(shopId);
             dto.setShopName(shop.getName());
+            dto.setLocation(shop.getLocation());
+            dto.setArrears(shop.getArrears());
             dto.setTotalSales(totalSales);
             dto.setTotalProfit(totalProfit);
             dto.setAverageMonthlyProfit(

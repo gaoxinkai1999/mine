@@ -18,6 +18,7 @@ export const ROUTE_NAMES = {
   SHOP_CREATE: 'shop-create',
   SHOP_DETAIL: 'shop-detail',
   SHOP_ARREARS: 'shop-arrears',
+  SHOP_MAP: 'shop-map',
   
   // 订单模块
   ORDER_HOME: 'order-home',

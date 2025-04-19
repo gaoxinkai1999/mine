@@ -4,6 +4,8 @@ import com.example.domain.batch.entity.Batch;
 import com.example.domain.inventory.dto.OperationType;
 import com.example.domain.order.entity.Order;
 import com.example.domain.product.entity.Product;
+import com.example.domain.purchase.entity.Purchase;
+import com.example.domain.returnOrder.entity.ReturnOrder;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.OnDelete;
@@ -50,5 +52,17 @@ public class InventoryTransaction {
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @JoinColumn(name = "order_id")
     @ToString.Exclude
-    private Order order;
+    private Order order; // 销售订单
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @JoinColumn(name = "purchase_id")
+    @ToString.Exclude
+    private Purchase purchase; // 采购订单
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @JoinColumn(name = "return_order_id")
+    @ToString.Exclude
+    private ReturnOrder returnOrder; // 退货订单
 }

@@ -36,7 +36,8 @@ export default {
       shopItems: [
         { title: "商家总览", name: ROUTE_NAMES.SHOP_LIST },
         { title: "商家统计信息", name: ROUTE_NAMES.STATISTICS_SHOP },
-        { title: "欠款详情", name: ROUTE_NAMES.SHOP_ARREARS }
+        { title: "欠款详情", name: ROUTE_NAMES.SHOP_ARREARS },
+        { title: "商家地图分布", name: ROUTE_NAMES.SHOP_MAP }
       ],
       productItems: [
         { title: "商品总览", name: ROUTE_NAMES.PRODUCT_LIST },

@@ -6,9 +6,10 @@ import AutoImport from 'unplugin-auto-import/vite';
 import Components from 'unplugin-vue-components/vite';
 import {VantResolver} from '@vant/auto-import-resolver';
 import {ElementPlusResolver} from 'unplugin-vue-components/resolvers'
-
+import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
     plugins: [vue(),
+        tailwindcss(),
         Pages({
             // 配置项（可选）
             dirs: './src/pages', // 默认扫描的文件夹

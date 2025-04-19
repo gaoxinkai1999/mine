@@ -1,7 +1,9 @@
 package com.example.domain.returnOrder.service;
 
 
+import com.example.domain.inventory.dto.OperationType; // 添加 OperationType 导入
 import com.example.domain.inventory.service.InventoryService;
+import com.example.domain.inventory.service.InventoryTransactionService; // 添加 InventoryTransactionService 导入
 import com.example.domain.product.entity.Product;
 import com.example.domain.product.service.ProductService;
 import com.example.domain.returnOrder.dto.ReturnOrderDto;
@@ -62,6 +64,9 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
 
     @Autowired
     private JPAQueryFactory queryFactory;
+
+    @Autowired
+    private InventoryTransactionService inventoryTransactionService; // 注入库存交易服务
 
     /**
      * 构建基本条件查询
@@ -184,10 +189,11 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
             
             // 处理库存
             if (detailRequest.getType() == com.example.domain.returnOrder.entity.ReturnType.退货退款) {
-                // 退货入库，使用实际的退货数量
-                inventoryService.stockIn(product, detailRequest.getQuantity());
-                // 这里可以记录库存操作，如果有需要
-                // inventoryService.recordTransaction(product, null, detailRequest.getQuantity(), OperationType.退货入库);
+               // 退货入库，使用实际的退货数量
+               inventoryService.stockIn(product, detailRequest.getQuantity());
+               // 记录库存流水 (退货入库)
+               // 注意：退货通常不关联批次，除非业务特别要求追踪退回的具体批次
+               inventoryTransactionService.recordTransactionForReturn(product, null, detailRequest.getQuantity(), OperationType.退货入库, savedReturnOrder);
             }
         }
         
@@ -215,9 +221,12 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
                 detail.getQuantity() != null && detail.getQuantity() > 0) {
                 // 商品退货入库时增加了库存，删除时应减少库存
                 Product product = detail.getProduct();
-                // 减少库存（回退之前的入库操作）
-                inventoryService.stockOut(product, detail.getQuantity());
-                log.info("商品库存已回退: 商品={}, 数量={}", product.getName(), detail.getQuantity());
+               // 减少库存（回退之前的入库操作）
+               inventoryService.stockOut(product, detail.getQuantity());
+              // 记录库存流水 (取消退货订单导致的出库)
+              // 注意：退货通常不关联批次
+              inventoryTransactionService.recordTransactionForReturn(product, null, -detail.getQuantity(), OperationType.取消退货订单, returnOrder);
+               log.info("商品库存已回退: 商品={}, 数量={}", product.getName(), detail.getQuantity());
             }
         }
         

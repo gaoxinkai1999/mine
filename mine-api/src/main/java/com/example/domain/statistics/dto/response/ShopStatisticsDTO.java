@@ -14,6 +14,8 @@ public class ShopStatisticsDTO {
 
     private int shopId; // 商家ID
     private String shopName; // 商家名称
+    private String location; // 商家地址
+    private BigDecimal arrears; // 商家欠款
     private BigDecimal totalSales; // 总销售额
     private BigDecimal totalProfit; // 总利润
     private BigDecimal averageMonthlyProfit; // 平均月利润
