@@ -189,7 +189,7 @@ html, body {
   flex: 1;
   position: relative;
   width: 100%;
-  overflow: auto;
+  overflow: hidden; /* 子页面负责控制各自内容的滚动 */
 }
 
 /* 只有当显示tabbar时才应用底部填充 */
@@ -197,18 +197,11 @@ html, body {
   padding-bottom: var(--van-tabbar-height) !important;
 }
 
-/* 添加用于有tabbar页面的内容底部填充类 */
-.content-with-tabbar {
-  margin-bottom: var(--van-tabbar-height) !important;
-}
+/* 移除content-with-tabbar类，由各页面自行处理底部间距 */
 
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .has-tabbar {
     padding-bottom: calc(var(--van-tabbar-height) + env(safe-area-inset-bottom, 0px)) !important;
-  }
-
-  .content-with-tabbar {
-    margin-bottom: calc(var(--van-tabbar-height) + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
@@ -247,12 +240,6 @@ html, body {
   body, .app-container {
     height: 100%;
     -webkit-overflow-scrolling: touch;
-  }
-  
-  .main-content {
-    -webkit-overflow-scrolling: touch;
-    height: 100%;
-    overflow: auto;
   }
 }
 

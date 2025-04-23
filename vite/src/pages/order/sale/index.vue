@@ -28,7 +28,7 @@
         <van-cell class="shop-info" icon="shop-o" size="large">
           <template #title>
             <div class="shop-title">
-              <span class="shop-name">{{ item.shop.name }}</span>
+              <span class="shop-name" @click.stop="filterByShop(item.shop)" style="cursor: pointer;">{{ item.shop.name }}</span>
               <van-tag v-if="item.shop.del" type="danger">弃用</van-tag>
             </div>
           </template>
@@ -79,14 +79,12 @@
 </template>
 
 <script>
-
 import {Clipboard} from '@capacitor/clipboard';
-
 import api from "@/api/index.js";
 import {formatReceipt, printOrder} from "@/utils/printService.js";
 import {showFailToast, showSuccessToast, showConfirmDialog} from "vant";
 import {useOrderListStore} from "@/stores/orderList.js";
-import {watch, watchEffect} from 'vue';
+import {watch} from 'vue';
 
 export default {
   name: 'SalesOrderList',
@@ -95,19 +93,14 @@ export default {
       type: Boolean,
       default: false
     },
-    customMode: {
-      type: Boolean,
-      default: false
-    },
     shopId: {
       type: [String, Number],
       default: null
     }
   },
-  emits: ['order-selected'],
+  emits: ['order-selected', 'filter-by-shop'],
   setup() {
     const orderListStore = useOrderListStore();
-
     return {
       orderListStore
     };
@@ -139,25 +132,21 @@ export default {
           callback: () => this.handleDeleteOrder(this.selectedOrder.id)
         }
       ],
-      selectedOrders: [],
-
+      selectedOrders: []
     }
   },
   mounted() {
     // 监听store中的选择模式变化
     watch(() => this.orderListStore.isSelectionMode, (newValue) => {
       if (!newValue) {
-        // 如果选择模式被关闭，清除本地选择状态
         this.clearSelection();
       }
     });
-    watch(this.orderListStore.filterParams, (newValue) => {
-          console.log("参数变更", newValue)
-           this.resetAndLoad()
-        }, {immediate: true})
 
-
+    
+    this.resetAndLoad(); // 保留初始加载
   },
+  
   methods: {
     openActionSheet(order) {
       this.selectedOrder = order;
@@ -166,10 +155,8 @@ export default {
     async handlePrintOrder() {
       try {
         await printOrder(this.selectedOrder, (status) => {
-          console.log(status);
         });
       } catch (error) {
-        console.error('打印失败', error);
       }
     },
     async handleCopyOrder(order) {
@@ -180,7 +167,6 @@ export default {
         });
         showSuccessToast('订单小票已复制到剪切板');
       } catch (err) {
-        console.error('复制失败:', err);
         showFailToast('复制失败，错误信息:' + err);
       }
     },
@@ -198,25 +184,23 @@ export default {
     async onLoad() {
       this.loading = true;
       try {
-        const response = await api.order.getOrders({
+        const params = {
           shopId: this.shopId || this.orderListStore.filterParams.shopId,
           startDate: this.orderListStore.filterParams.startDate,
           endDate: this.orderListStore.filterParams.endDate,
           page: this.pageIndex,
           size: this.pageSize
-        });
-        console.log(this.filterParams)
+        };
+        const response = await api.order.getOrders(params);
 
         if (response && response.content && Array.isArray(response.content)) {
           this.orders.push(...response.content);
           this.pageIndex += 1;
           this.finished = !response.hasNext;
         } else {
-          console.error('获取订单数据格式错误:', response);
           this.finished = true;
         }
       } catch (error) {
-        console.error('获取订单失败', error);
         showFailToast('获取订单失败');
       } finally {
         this.loading = false;
@@ -226,7 +210,9 @@ export default {
       this.orders = [];
       this.pageIndex = 0;
       this.finished = false;
-      this.onLoad();
+      this.loading = false; // Keep loading false, van-list should trigger load
+
+      this.onLoad()
     },
     isOrderSelected(order) {
       return this.selectedOrders.some(item => item.id === order.id);
@@ -242,142 +228,146 @@ export default {
     },
     clearSelection() {
       this.selectedOrders = [];
+    },
+    // 确保 filterByShop 方法存在
+    filterByShop(shop) {
+      this.$emit('filter-by-shop', shop);
     }
   }
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .sales-order-list {
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
   padding: 10px;
-  background-color: #f7f8fa;
+  box-sizing: border-box;
+}
 
-  .order-card {
-    margin-bottom: 15px;
-    border-radius: 8px;
-    overflow: hidden;
-    background-color: #ffffff;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: box-shadow 0.3s;
+.order-card {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
 
-    &:hover {
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    }
+.order-header {
+  background-color: #f8f8f8;
+}
 
-    .order-header {
-      &-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 0;
-        width: 100%;
+.order-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
 
-        .order-header-left {
-          .order-id {
-            font-size: 16px;
-            font-weight: 600;
-            color: #333;
-          }
+.order-header-left {
+  display: flex;
+  flex-direction: column;
+}
 
-          .order-time {
-            font-size: 12px;
-            color: #888;
-            margin-left: 10px;
-          }
-        }
-      }
-    }
+.order-id {
+  font-weight: bold;
+  font-size: 14px;
+}
 
-    .shop-info {
-      .shop-title {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+.order-time {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
 
-        .shop-name {
-          font-size: 15px;
-          font-weight: 600;
-        }
-      }
+.shop-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-      .shop-location {
-        font-size: 13px;
-        color: #666;
-      }
-    }
+.shop-name {
+  font-weight: bold;
+  color: #323233;
+}
 
-    .order-details {
-      padding: 12px;
-      background-color: #f8f8f8;
+.shop-location {
+  color: #969799;
+}
 
-      .order-detail-item {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #eee;
+.order-details {
+  padding: 12px 16px;
+  background-color: #fff;
+  border-bottom: 1px solid #f2f3f5;
+}
 
-        &:last-child {
-          margin-bottom: 0;
-          padding-bottom: 0;
-          border-bottom: none;
-        }
+.order-detail-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
 
-        .product-info {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+.order-detail-item:last-child {
+  margin-bottom: 0;
+}
 
-          .product-name {
-            font-size: 14px;
-            color: #333;
-          }
-        }
+.product-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-        .quantity-price {
-          display: flex;
-          align-items: center;
-          gap: 12px;
+.product-name {
+  color: #323233;
+}
 
-          .quantity {
-            font-size: 13px;
-            color: #666;
-          }
+.quantity-price {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-          .price {
-            font-size: 14px;
-            font-weight: 600;
-            color: #07c160;
-          }
-        }
-      }
-    }
+.quantity {
+  color: #969799;
+}
 
-    .order-summary {
-      padding: 12px;
-      border-top: 1px solid #eee;
+.price {
+  font-weight: bold;
+}
 
-      .summary-item {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
+.order-summary {
+  padding: 12px 16px;
+  background-color: #fff;
+  display: flex;
+  justify-content: flex-end;
+  gap: 24px;
+}
 
-        &:last-child {
-          margin-bottom: 0;
-        }
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
 
-        .label {
-          font-size: 14px;
-          color: #666;
-        }
+.summary-item .label {
+  font-size: 12px;
+  color: #969799;
+}
 
-        .value {
-          font-size: 14px;
-          font-weight: 600;
-          color: #07c160;
-        }
-      }
-    }
-  }
+.summary-item .value {
+  font-weight: bold;
+  font-size: 14px;
+  color: #323233;
+}
+
+/* 针对总价值 */
+.summary-item:first-child .value {
+  color: #ee0a24;
+}
+
+/* 针对利润 */
+.summary-item:last-child .value {
+  color: #07c160;
 }
 </style>

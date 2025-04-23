@@ -101,7 +101,6 @@ const receiveDataFromChild = (data) => {
   currentShop.value = data
   showPicker.value = false
   // 处理从子组件传来的数据
-  console.log(data)
 }
 
 // 添加显示历史订单的方法

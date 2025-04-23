@@ -29,17 +29,6 @@
           />
         </div>
       </div>
-
-<!--      &lt;!&ndash; 底部按钮 &ndash;&gt;-->
-<!--      <div class="popup-footer">-->
-<!--        <van-button -->
-<!--          block -->
-<!--          type="primary"-->
-<!--          @click="handleConfirm"-->
-<!--        >-->
-<!--          确认选择-->
-<!--        </van-button>-->
-<!--      </div>-->
     </div>
   </van-popup>
 </template>
@@ -82,7 +71,6 @@ const initForm = () => {
     form.value[batch.batchId] = 0;
   });
 };
-
 
 
 
@@ -206,4 +194,4 @@ watch(() => props.visible, (val) => {
 .batch-list::-webkit-scrollbar-track {
   background: transparent;
 }
-</style> 
+</style>

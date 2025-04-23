@@ -188,13 +188,7 @@ export default {
           }
         }
         
-        console.log('已还原筛选条件:', {
-          shop: this.shop,
-          startDate: this.form.startDate,
-          endDate: this.form.endDate
-        });
       } catch (error) {
-        console.error('还原筛选条件出错:', error);
         showFailToast('还原筛选条件失败');
       }
     },
@@ -234,9 +228,7 @@ export default {
         });
         
         showSuccessToast('筛选条件已应用');
-        console.log('提交筛选条件:', query);
       } catch (error) {
-        console.error('提交筛选条件出错:', error);
         showFailToast('应用筛选条件失败');
       }
     },
@@ -244,9 +236,8 @@ export default {
     // 日期范围选择
     onConfirmDateRange(dateRange) {
       try {
-        if (!Array.isArray(dateRange) || dateRange.length < 2 || 
+        if (!Array.isArray(dateRange) || dateRange.length < 2 ||
             !(dateRange[0] instanceof Date) || !(dateRange[1] instanceof Date)) {
-          console.error('无效的日期范围:', dateRange);
           return;
         }
         
@@ -260,10 +251,7 @@ export default {
         this.form.startDate = formatDate(dateRange[0]);
         this.form.endDate = formatDate(dateRange[1]);
         this.showCalendarRange = false;
-        
-        console.log('已选择日期范围:', this.form.startDate, '至', this.form.endDate);
       } catch (error) {
-        console.error('选择日期范围出错:', error);
         showFailToast('选择日期范围失败');
       }
     },
@@ -273,17 +261,13 @@ export default {
       try {
         // 验证商店数据的有效性
         if (!data || !data.id) {
-          console.error('接收到无效的商店数据:', data);
           return;
         }
         
         this.shop = data;
         this.form.shopId = data.id;
         this.showPicker = false;
-        
-        console.log('已选择商店:', data);
       } catch (error) {
-        console.error('选择商店出错:', error);
         showFailToast('选择商店失败');
       }
     }

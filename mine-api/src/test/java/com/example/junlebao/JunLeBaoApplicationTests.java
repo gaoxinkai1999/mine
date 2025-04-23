@@ -2,9 +2,10 @@ package com.example.junlebao;
 
 
 import com.example.domain.forecast.service.ForecastService;
-import com.example.domain.product.dto.ProductDto;
 import com.example.domain.product.service.ProductService;
 import com.example.domain.purchase.service.PurchaseService;
+import com.example.domain.shop.entity.Shop;
+import com.example.domain.shop.service.ShopService;
 import com.example.domain.statistics.dto.response.SalesStatisticsDTO;
 import com.example.domain.statistics.service.StatisticsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,17 +33,15 @@ class JunLeBaoApplicationTests {
     ForecastService forecastService;
     @Autowired
     PurchaseService purchaseService;
+    @Autowired
+    private ShopService shopService;
 
     @Test
     void contextLoads() {
-        List<ProductDto> products = productService.getProducts();
-
-        // 取出商品id
-        int[] array = products.stream()
-                              .mapToInt(ProductDto::getId)
-                              .toArray();
-        Map<Integer, Map<String, Integer>> integerMapMap = purchaseService.calculatePurchaseQuantity(array);
-        System.out.println(integerMapMap);
+        List<Shop> activeShopsQueryDSL = shopService.findActiveShopsQueryDSL(90);
+        System.out.println(activeShopsQueryDSL.size());
+        List<Shop> inactiveShopsQueryDSL = shopService.findInactiveShopsQueryDSL(90);
+        System.out.println(inactiveShopsQueryDSL.size());
     }
 
     @Test

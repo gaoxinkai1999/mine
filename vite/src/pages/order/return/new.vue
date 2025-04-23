@@ -105,7 +105,6 @@ const handleSubmitReturn = () => {
       .then(success => {
         if (success) {
           // 成功提交后会自动返回订单列表页
-          console.log('退货单提交成功');
         }
       });
   })

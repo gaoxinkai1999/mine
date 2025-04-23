@@ -25,7 +25,7 @@ export const useOrderListStore = defineStore('orderList', () => {
   const selectedOrders = ref([])
   
   /** 活动tab索引 */
-  const activeTab = ref(0)
+  const activeTab = ref('0')
   
   // ==================== 计算属性 ====================
   /** 是否有筛选条件 */
@@ -63,25 +63,20 @@ export const useOrderListStore = defineStore('orderList', () => {
     if (params.shopName !== undefined) filterParams.value.shopName = params.shopName
     if (params.startDate !== undefined) filterParams.value.startDate = params.startDate
     if (params.endDate !== undefined) filterParams.value.endDate = params.endDate
-
   }
   
-
-
   /**
    * 清除所有筛选
    */
   function clearAllFilters() {
-    filterParams.value.shopId = null
-    filterParams.value.shopName = ''
-    filterParams.value.startDate = null
-    filterParams.value.endDate = null
-
+    // 完全重置筛选参数对象，确保状态更新
+    filterParams.value = {
+      shopId: null,
+      shopName: '',
+      startDate: null,
+      endDate: null
+    }
   }
-
-  
-
-
   
   /**
    * 开始多选模式
@@ -185,6 +180,4 @@ export const useOrderListStore = defineStore('orderList', () => {
     handleMergedPrint,
     handleMergedCopy
   }
-}, {
-  persist: true // 开启持久化存储
 }) 
