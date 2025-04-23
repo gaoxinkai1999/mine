@@ -66,12 +66,7 @@
           </div>
         </div>
 
-        <!-- 快捷操作按钮 -->
-        <div class="quick-actions">
-          <van-button type="primary" size="small" icon="printer" plain class="quick-action-btn" @click="handlePrintOrder()">打印</van-button>
-          <van-button type="info" size="small" icon="description" plain class="quick-action-btn" @click="handleCopyOrder(item)">复制</van-button>
-          <van-button type="danger" size="small" icon="delete" plain class="quick-action-btn" @click="handleDeleteOrder(item.id)">删除</van-button>
-        </div>
+        <!-- 快捷操作按钮区域移除，操作统一放入 ActionSheet -->
       </van-cell-group>
     </van-list>
 
@@ -83,6 +78,7 @@
         close-on-click-action
         round
     />
+    <!-- 修改欠款弹窗已移除 -->
   </div>
 </template>
 
@@ -90,9 +86,9 @@
 import {Clipboard} from '@capacitor/clipboard';
 import api from "@/api/index.js";
 import {formatReturnReceipt, printReturnOrder} from "@/utils/printService.js";
-import {showFailToast, showSuccessToast, showConfirmDialog} from "vant";
+import {showFailToast, showSuccessToast, showConfirmDialog} from "vant"; // 移除 showLoadingToast
 import {useOrderListStore} from "@/stores/orderList.js";
-import {watch} from 'vue';
+import {watch} from 'vue'; // 移除 nextTick
 
 export default {
   name: 'ReturnOrderList',
@@ -122,23 +118,27 @@ export default {
       pageSize: 10,
       showActionSheet: false,
       selectedOrder: null,
+      // showArrearsPopup 和 arrearsEditData 已移除
       actions: [
-        {name: '单个操作', subname: '针对当前选中订单的操作', disabled: true},
+        {name: '单个操作', subname: '针对当前选中订单的操作', disabled: true}, // 恢复原始标题
         {
           name: '打印退货单',
+          color: '#07c160',
+          name: '打印退货单', // 恢复原始名称
           color: '#07c160',
           callback: () => this.handlePrintOrder()
         },
         {
-          name: '复制退货单',
+          name: '复制退货单', // 恢复原始名称
           color: '#1989fa',
           callback: () => this.handleCopyOrder(this.selectedOrder)
         },
         {
-          name: '删除退货单',
+          name: '删除退货单', // 恢复原始名称
           color: '#ee0a24',
           callback: () => this.handleDeleteOrder(this.selectedOrder.id)
         }
+        // 移除商家操作和修改欠款项
       ],
       selectedOrders: []
     }
@@ -166,16 +166,26 @@ export default {
     },
     openActionSheet(order) {
       this.selectedOrder = order;
+      // 移除动态修改 ActionSheet 按钮状态的逻辑
       this.showActionSheet = true;
     },
     async handlePrintOrder() {
+      if (!this.selectedOrder) { // 检查 selectedOrder
+          showFailToast('无法确定要打印的退货单');
+          return;
+      }
       try {
-        await printReturnOrder(this.selectedOrder, (status) => {
+        await printReturnOrder(this.selectedOrder, (status) => { // 使用 this.selectedOrder
         });
       } catch (error) {
+        showFailToast('打印失败: ' + (error.message || '未知错误'));
       }
     },
-    async handleCopyOrder(order) {
+    async handleCopyOrder(order) { // ActionSheet 回调会传入 selectedOrder
+      if (!order) {
+          showFailToast('无法确定要复制的退货单');
+          return;
+      }
       try {
         const receipt = formatReturnReceipt(order, false);
         await Clipboard.write({
@@ -187,6 +197,10 @@ export default {
       }
     },
     handleDeleteOrder(id) {
+       if (!id) {
+          showFailToast('无法确定要删除的退货单');
+          return;
+      }
       showConfirmDialog({
         title: '确认删除',
         message: '确定要删除这个退货单吗？'
@@ -246,11 +260,14 @@ export default {
     filterByShop(shop) {
       this.$emit('filter-by-shop', shop);
     }
+    // --- 移除修改欠款相关方法 openArrearsPopup 和 saveArrears ---
   }
 }
 </script>
 
 <style scoped>
+/* --- 移除复用的弹窗样式 --- */
+
 .return-order-list {
   width: 100%;
   height: 100%;

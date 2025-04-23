@@ -51,28 +51,28 @@
           >
             多选
           </van-button>
-          <template v-else>
-            <van-button
-              :disabled="orderListStore.selectedOrders.length === 0 || !orderListStore.isSameShop"
-              type="success"
-              size="small"
-              class="action-btn print-btn"
-              icon="printer"
-              @click="orderListStore.handleMergedPrint()"
-            >
-              合并打印
-            </van-button>
-            <van-button
-              :disabled="orderListStore.selectedOrders.length === 0 || !orderListStore.isSameShop"
-              type="primary"
-              size="small"
-              class="action-btn copy-btn"
-              icon="description"
-              @click="orderListStore.handleMergedCopy()"
-            >
-              合并复制
-            </van-button>
-          </template>
+          <!-- 多选模式下的操作按钮，使用 Popover -->
+          <van-popover
+            v-else
+            v-model:show="showPopover"
+            :actions="popoverActions"
+            @select="handlePopoverSelect"
+            placement="bottom-end"
+            theme="light"
+            :offset="[8, 8]"
+          >
+            <template #reference>
+              <van-button
+                plain
+                type="primary"
+                size="small"
+                class="action-btn"
+                icon="ellipsis"
+              >
+                操作
+              </van-button>
+            </template>
+          </van-popover>
         </div>
       </template>
       </van-nav-bar>
@@ -161,7 +161,7 @@ import salesOrderList from "@/pages/order/sale/index.vue";
 import returnOrderList from "@/pages/order/return/index.vue";
 import { useOrderListStore } from "@/stores/orderList";
 import { ROUTE_NAMES } from '@/constants/routeNames';
-import { onMounted, ref,onUnmounted } from 'vue';
+import { onMounted, ref, onUnmounted, computed } from 'vue'; // 引入 computed
 import { useRoute, useRouter } from 'vue-router';
 
 export default {
@@ -173,6 +173,33 @@ export default {
     const router = useRouter();
     const salesOrderList = ref(null);
     const returnOrderList = ref(null);
+    const showPopover = ref(false); // 控制 Popover 显示
+
+    // Popover 操作项
+    const popoverActions = computed(() => [
+      {
+        text: '合并打印',
+        icon: 'printer',
+        disabled: orderListStore.selectedOrders.length === 0 || !orderListStore.isSameShop,
+        actionKey: 'print' // 添加唯一标识
+      },
+      {
+        text: '合并复制',
+        icon: 'description',
+        disabled: orderListStore.selectedOrders.length === 0 || !orderListStore.isSameShop,
+        actionKey: 'copy' // 添加唯一标识
+      },
+    ]);
+
+    // 处理 Popover 选择事件
+    const handlePopoverSelect = (selectedAction) => {
+      if (selectedAction.actionKey === 'print') {
+        orderListStore.handleMergedPrint();
+      } else if (selectedAction.actionKey === 'copy') {
+        orderListStore.handleMergedCopy();
+      }
+      showPopover.value = false; // 选择后关闭 Popover
+    };
 
     // 更新筛选参数从路由到store
     const updateFiltersFromRoute = () => {
@@ -265,7 +292,10 @@ export default {
       handleOrderSelected,
       handleFilterByShop,
       salesOrderList,
-      returnOrderList
+      returnOrderList,
+      showPopover,        // 导出 Popover 显示状态
+      popoverActions,     // 导出 Popover 操作项
+      handlePopoverSelect // 导出 Popover 选择处理函数
     };
   }
 }
