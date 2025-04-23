@@ -13,12 +13,15 @@
           title="全部订单"
           safe-area-inset-top
           :z-index="102" 
+          class="custom-nav-bar"
       >
       <template #left>
         <van-button
           v-if="!orderListStore.isSelectionMode"
           type="primary"
           size="small"
+          class="action-btn filter-btn"
+          icon="filter-o"
           @click="goToChooseOrder()"
         >
           筛选
@@ -28,6 +31,8 @@
           plain
           type="default"
           size="small"
+          class="action-btn"
+          icon="cross"
           @click="orderListStore.cancelSelection()"
         >
           取消
@@ -40,6 +45,8 @@
             plain
             type="primary"
             size="small"
+            class="action-btn"
+            icon="checked"
             @click="orderListStore.startSelection()"
           >
             多选
@@ -49,8 +56,9 @@
               :disabled="orderListStore.selectedOrders.length === 0 || !orderListStore.isSameShop"
               type="success"
               size="small"
+              class="action-btn print-btn"
+              icon="printer"
               @click="orderListStore.handleMergedPrint()"
-              style="margin-right: 10px;"
             >
               合并打印
             </van-button>
@@ -58,6 +66,8 @@
               :disabled="orderListStore.selectedOrders.length === 0 || !orderListStore.isSameShop"
               type="primary"
               size="small"
+              class="action-btn copy-btn"
+              icon="description"
               @click="orderListStore.handleMergedCopy()"
             >
               合并复制
@@ -78,33 +88,46 @@
             type="primary"
             size="medium"
             style="cursor: pointer;"
+            class="filter-tag shop-tag"
             title="点击商店名浏览该商店订单"
           >
-            商店: {{ orderListStore.filterParams.shopName }}
+            <van-icon name="shop-o" />
+            {{ orderListStore.filterParams.shopName }}
           </van-tag>
           <van-tag
             v-if="orderListStore.dateRangeText"
             type="success"
             size="medium"
+            class="filter-tag date-tag"
             title="订单日期范围"
           >
-            日期: {{ orderListStore.dateRangeText }}
+            <van-icon name="calendar-o" />
+            {{ orderListStore.dateRangeText }}
           </van-tag>
           <van-tag
             type="danger"
             size="medium"
             @click="clearAllFilters"
             style="cursor: pointer;"
+            class="filter-tag clear-tag"
             title="清除所有筛选条件"
           >
-            清除
+            <van-icon name="delete-o" />
+            清除筛选
           </van-tag>
         </div>
       </div>
 
       <!-- Tabs 容器 -->
       <div class="tabs-container">
-        <van-tabs v-model:active="orderListStore.activeTab" sticky :offset-top="46">
+        <van-tabs 
+          v-model:active="orderListStore.activeTab" 
+          sticky 
+          :offset-top="46"
+          animated
+          swipeable
+          class="custom-tabs"
+        >
           <van-tab title="销售订单" name="0"></van-tab>
           <van-tab title="退货订单" name="1"></van-tab>
         </van-tabs>
@@ -254,38 +277,110 @@ export default {
   flex-direction: column;
   position: relative;
   width: 100%;
-  height: 100vh; /* 使用 vh 单位确保占满整个视口高度 */
-  overflow: hidden; /* 防止整体滚动 */
-  background-color: #f7f8fa;
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f6f9fc 0%, #eef2f5 100%);
 }
 
 .page-header {
   flex-shrink: 0; /* 防止头部被压缩 */
   background-color: #fff; /* 给头部一个背景色 */
-  z-index: 1; /* 确保头部在内容之上 */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10; /* 确保头部在内容之上 */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.custom-nav-bar {
+  background: linear-gradient(135deg, #4a6cf7 0%, #2541b2 100%);
+  box-shadow: 0 4px 20px rgba(37, 65, 178, 0.2);
+}
+
+.custom-nav-bar :deep(.van-nav-bar__title) {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.action-btn {
+  border-radius: 8px;
+  padding: 0 16px;
+  height: 36px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:active {
+  opacity: 0.8;
+}
+
+.filter-btn {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: transparent;
+  color: white;
+}
+
+.print-btn {
+  margin-right: 8px;
+}
+
+.copy-btn {
+  background-color: #1989fa;
 }
 
 .filter-tags {
-  padding: 8px 16px;
-  border-bottom: 1px solid #ebedf0;
-  overflow-x: auto; /* 添加横向滚动支持 */
-  -webkit-overflow-scrolling: touch; /* 提升移动端滚动体验 */
-  max-width: 100%; /* 限制最大宽度 */
+  padding: 12px 16px;
+  border-bottom: none;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .filter-tag-scroll {
   display: flex;
   align-items: center;
   flex-wrap: nowrap; /* 改为不换行 */
-  gap: 8px;
+  gap: 10px;
   min-width: min-content; /* 保证内容不被压缩 */
   padding-bottom: 4px; /* 为可能的滚动条留出空间 */
 }
 
 /* 为筛选标签添加样式 */
-.filter-tag-scroll .van-tag {
-  flex-shrink: 0; /* 防止被压缩 */
+.filter-tag {
+  flex-shrink: 0;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.filter-tag :deep(.van-icon) {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+.shop-tag {
+  background-color: #1989fa;
+  border-color: #1989fa;
+}
+
+.date-tag {
+  background-color: #07c160;
+  border-color: #07c160;
+}
+
+.clear-tag {
+  background-color: #f56c6c;
+  border-color: #f56c6c;
 }
 
 .tabs-container {
@@ -293,24 +388,26 @@ export default {
   z-index: 1;
 }
 
-.tabs-container .van-tabs {
+.custom-tabs {
   width: 100%;
 }
 
-/* 增强选项卡的样式 */
-.tabs-container .van-tab {
+.custom-tabs :deep(.van-tab) {
   font-size: 15px;
   font-weight: 500;
+  padding: 16px 0;
 }
 
-.tabs-container .van-tab--active {
-  font-weight: 700;
+.custom-tabs :deep(.van-tab--active) {
+  font-weight: 600;
   color: #1989fa;
 }
 
-.tabs-container .van-tabs__line {
+.custom-tabs :deep(.van-tabs__line) {
   background-color: #1989fa;
   height: 3px;
+  border-radius: 3px;
+  bottom: 15px;
 }
 
 .main-content-area {
@@ -318,8 +415,11 @@ export default {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   position: relative;
-  background-color: #f7f8fa;
-  padding-bottom: calc(50px + env(safe-area-inset-bottom, 0px)); /* 确保在有Tabbar的页面底部有足够空间 */
+  background: white;
+  border-radius: 24px 24px 0 0;
+  margin-top: -12px;
+  padding: 24px 16px calc(50px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .nav-right-btns {

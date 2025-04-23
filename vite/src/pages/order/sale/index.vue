@@ -17,7 +17,7 @@
                 <span class="order-id">ID: {{ item.id }}</span>
                 <span class="order-time">{{ item.createTime }}</span>
               </div>
-              <van-button size="small" type="primary" @click="openActionSheet(item)">
+              <van-button size="small" type="primary" class="action-button" plain icon="more-o" @click="openActionSheet(item)">
                 操作
               </van-button>
             </div>
@@ -29,11 +29,11 @@
           <template #title>
             <div class="shop-title">
               <span class="shop-name" @click.stop="filterByShop(item.shop)" style="cursor: pointer;">{{ item.shop.name }}</span>
-              <van-tag v-if="item.shop.del" type="danger">弃用</van-tag>
+              <van-tag v-if="item.shop.del" type="danger" round>弃用</van-tag>
             </div>
           </template>
           <template #label>
-            <span class="shop-location">{{ item.shop.location }}</span>
+            <span class="shop-location"><van-icon name="location-o" /> {{ item.shop.location }}</span>
           </template>
         </van-cell>
 
@@ -45,7 +45,7 @@
           >
             <div class="product-info">
               <span class="product-name">{{ orderDetail.product.name }}</span>
-              <van-tag v-if="!orderDetail.defaultPrice" size="mini" type="danger">特价</van-tag>
+              <van-tag v-if="!orderDetail.defaultPrice" size="mini" type="danger" round>特价</van-tag>
             </div>
             <div class="quantity-price">
               <span class="quantity">x{{ orderDetail.quantity }}</span>
@@ -58,12 +58,19 @@
         <div class="order-summary">
           <div class="summary-item">
             <span class="label">总价</span>
-            <span class="value">¥{{ item.totalSalesAmount }}</span>
+            <span class="value total-amount">¥{{ item.totalSalesAmount }}</span>
           </div>
           <div class="summary-item">
             <span class="label">利润</span>
-            <span class="value">¥{{ item.totalProfit }}</span>
+            <span class="value profit-amount">¥{{ item.totalProfit }}</span>
           </div>
+        </div>
+
+        <!-- 快捷操作按钮 -->
+        <div class="quick-actions">
+          <van-button type="primary" size="small" icon="printer" plain class="quick-action-btn" @click="handlePrintOrder()">打印</van-button>
+          <van-button type="info" size="small" icon="description" plain class="quick-action-btn" @click="handleCopyOrder(item)">复制</van-button>
+          <van-button type="danger" size="small" icon="delete" plain class="quick-action-btn" @click="handleDeleteOrder(item.id)">删除</van-button>
         </div>
       </van-cell-group>
     </van-list>
@@ -74,6 +81,7 @@
         :actions="actions"
         cancel-text="取消"
         close-on-click-action
+        round
     />
   </div>
 </template>
@@ -242,20 +250,27 @@ export default {
   width: 100%;
   height: 100%;
   background-color: transparent;
-  padding: 10px;
+  padding: 12px;
   box-sizing: border-box;
 }
 
 .order-card {
-  margin-bottom: 12px;
-  border-radius: 8px;
+  margin-bottom: 16px;
+  border-radius: 12px;
   overflow: hidden;
   background-color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.order-card:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .order-header {
-  background-color: #f8f8f8;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .order-header-content {
@@ -271,14 +286,19 @@ export default {
 }
 
 .order-id {
-  font-weight: bold;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #323233;
 }
 
 .order-time {
   font-size: 12px;
-  color: #999;
+  color: #969799;
   margin-top: 4px;
+}
+
+.action-button {
+  border-radius: 4px;
 }
 
 .shop-title {
@@ -288,12 +308,17 @@ export default {
 }
 
 .shop-name {
-  font-weight: bold;
-  color: #323233;
+  font-weight: 600;
+  color: #1989fa;
+  font-size: 15px;
 }
 
 .shop-location {
   color: #969799;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .order-details {
@@ -305,11 +330,14 @@ export default {
 .order-detail-item {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed #f2f3f5;
 }
 
 .order-detail-item:last-child {
   margin-bottom: 0;
+  border-bottom: none;
 }
 
 .product-info {
@@ -320,28 +348,35 @@ export default {
 
 .product-name {
   color: #323233;
+  font-weight: 500;
 }
 
 .quantity-price {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .quantity {
   color: #969799;
+  background-color: #f2f3f5;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 12px;
 }
 
 .price {
-  font-weight: bold;
+  font-weight: 600;
+  color: #323233;
 }
 
 .order-summary {
   padding: 12px 16px;
-  background-color: #fff;
+  background-color: #fafafa;
   display: flex;
   justify-content: flex-end;
   gap: 24px;
+  border-top: 1px solid #f2f3f5;
 }
 
 .summary-item {
@@ -353,21 +388,36 @@ export default {
 .summary-item .label {
   font-size: 12px;
   color: #969799;
+  margin-bottom: 2px;
 }
 
 .summary-item .value {
-  font-weight: bold;
-  font-size: 14px;
-  color: #323233;
+  font-weight: 600;
+  font-size: 16px;
 }
 
 /* 针对总价值 */
-.summary-item:first-child .value {
+.total-amount {
   color: #ee0a24;
 }
 
 /* 针对利润 */
-.summary-item:last-child .value {
+.profit-amount {
   color: #07c160;
+}
+
+/* 快捷操作按钮 */
+.quick-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  gap: 8px;
+  background-color: #fff;
+  border-top: 1px solid #f5f5f5;
+}
+
+.quick-action-btn {
+  border-radius: 4px;
+  font-size: 12px;
 }
 </style>
