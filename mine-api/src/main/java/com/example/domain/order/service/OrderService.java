@@ -159,6 +159,10 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
         Order order = new Order();
         order.setShop(shop);
 
+        // 先保存一次 Order 以获取 ID 并纳入持久化上下文
+        // 注意：如果 Order 有复杂的生成策略或需要先计算总价，可能需要调整
+        orderRepository.save(order);
+
         // 处理订单项
         for (OrderCreateRequest.OrderItemRequest itemRequest : request.getItems()) {
             // 获取商品信息
@@ -231,10 +235,17 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
                // 记录库存流水 (销售出库)
                inventoryTransactionService.recordTransactionForSales(product, null, -itemRequest.getQuantity(), OperationType.销售出库, order);
             }
+            // 在循环结束后，可能需要再次保存以更新计算后的总价等信息
+            // 如果 OrderDetail 的级联保存已经处理了总价更新，则可能不需要再次保存
+            // 但为了确保 InventoryTransaction 能关联到持久化的 Order，第一次保存是必要的
         }
-
-        // 保存订单
+        
+        // 如果在循环中修改了 Order 的属性（例如总价），需要再次保存以更新
+        // 如果 Order 的总价等是在 addOrderDetail 中通过计算并设置，并且 CascadeType.ALL 生效，
+        // Hibernate 在事务提交时会自动更新 Order。但显式保存更清晰。
+        order.calculateTotals(); // 确保在保存前计算总价
         orderRepository.save(order);
+
     }
 
     /**
