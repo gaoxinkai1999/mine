@@ -467,7 +467,9 @@ jobs:
         run: |
           echo "准备更新 version.json 中的 apkUrl..."
           VERSION_FILE="version.json"
-          APK_URL="https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com/${{ env.APK_NAME }}"
+          # 使用自定义 CDN 域名
+          CUSTOM_CDN_DOMAIN="cdn.abocidee.com"
+          APK_URL="https://${CUSTOM_CDN_DOMAIN}/${{ env.APK_NAME }}"
           echo "新的 APK URL: $APK_URL"
 
           # 使用 jq 更新 apkUrl 字段
