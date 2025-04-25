@@ -398,7 +398,7 @@ jobs:
           # 执行 Gradle 构建命令
           echo "开始执行 Gradle 构建 (assembleRelease) 并添加 --info --stacktrace 获取最详细错误信息..."
           # 将签名属性（如果存在）附加到命令末尾，并添加 --info --stacktrace
-          ./gradlew assembleRelease $SIGNING_PROPS --info --stacktrace
+          ./gradlew assembleRelease $SIGNING_PROPS --parallel --configure-on-demand --build-cache --info --stacktrace
 
           if [ $? -ne 0 ]; then
             echo "错误：Android Release APK 构建失败！" >&2
