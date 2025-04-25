@@ -103,7 +103,7 @@ vite/android/app/src/main/assets/public/
 
 # Gradle包装器生成文件
 vite/android/.gradle/
-vite/android/gradle/wrapper/gradle-wrapper.jar
+# vite/android/gradle/wrapper/gradle-wrapper.jar (已移除忽略，提交包装器 JAR)
 
 # 安卓APK和Bundle文件
 *.apk
