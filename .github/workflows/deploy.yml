@@ -306,6 +306,26 @@ jobs:
       # 步骤 17: 构建前端项目
       # 执行 npm run build 命令，并指定 mode 为 production
       # (对应 deploy-all.ps1 第 182-193 行的一部分)
+# 步骤 16.5: 创建生产环境 .env 文件
+      # 从 GitHub Secrets 读取生产环境 API URL，并写入 .env.production 文件
+      # 这是因为 .env 文件通常被 git 忽略，无法直接在 Actions 环境中使用
+      - name: 创建生产环境 .env 文件
+        working-directory: ${{ env.FRONTEND_DIR }} # 指定工作目录为 vite
+        env:
+          VITE_API_URL_PROD_SECRET: ${{ secrets.VITE_API_URL_PROD }} # 将 Secret 读入环境变量
+        run: |
+          echo "创建 vite/.env.production 文件..."
+          # 检查 Secret 是否为空
+          if [ -z "$VITE_API_URL_PROD_SECRET" ]; then
+            echo "错误：GitHub Secret 'VITE_API_URL_PROD' 未设置或为空！" >&2
+            exit 1
+          fi
+          # 将 Secret 值写入文件
+          echo "VITE_API_URL=$VITE_API_URL_PROD_SECRET" > .env.production
+          echo "VITE_ENV=production" >> .env.production
+          echo "vite/.env.production 文件创建完成。"
+          echo "文件内容预览:"
+          cat .env.production # 打印文件内容以供调试
       - name: 构建前端项目 (npm run build --mode production)
         working-directory: ${{ env.FRONTEND_DIR }} # 指定工作目录为 vite
         run: |
