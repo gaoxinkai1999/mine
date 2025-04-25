@@ -314,6 +314,10 @@ jobs:
       # 步骤 19: 构建 Android Release APK
       # (对应 deploy-all.ps1 第 208-227 行)
 
+      # 新步骤：设置 Gradle 环境
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
       # 19.1: 设置 Android SDK 环境
       # 使用 android-actions/setup-android@v3 Action 自动下载和配置构建所需的 Android SDK
       - name: 设置 Android SDK 环境
@@ -349,7 +353,12 @@ jobs:
         working-directory: ${{ env.FRONTEND_DIR }}/android # Gradle 命令需要在 android 目录下执行
         run: |
           echo "进入 Android 项目目录: $(pwd)"
+          # 验证 Java 环境
+          echo "验证 Java 环境..."
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
           # 确保 gradlew 脚本有执行权限
+          echo "为 gradlew 添加执行权限..."
           chmod +x ./gradlew
 
           # 准备 Gradle 签名参数 (如果 Keystore 和密码可用)
@@ -371,9 +380,9 @@ jobs:
           fi
 
           # 执行 Gradle 构建命令
-          echo "开始执行 Gradle 构建 (assembleRelease) 并添加 --stacktrace 获取详细错误信息..."
-          # 将签名属性（如果存在）附加到命令末尾，并添加 --stacktrace
-          ./gradlew assembleRelease $SIGNING_PROPS --stacktrace
+          echo "开始执行 Gradle 构建 (assembleRelease) 并添加 --info --stacktrace 获取最详细错误信息..."
+          # 将签名属性（如果存在）附加到命令末尾，并添加 --info --stacktrace
+          ./gradlew assembleRelease $SIGNING_PROPS --info --stacktrace
 
           if [ $? -ne 0 ]; then
             echo "错误：Android Release APK 构建失败！" >&2
