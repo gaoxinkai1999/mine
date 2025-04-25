@@ -40,6 +40,26 @@ jobs:
       - name: 检出代码仓库
         uses: actions/checkout@v4
 
+      # 缓存 Android/Gradle 依赖，加速后续构建
+      - name: 缓存 Gradle 依赖
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('vite/android/gradle/wrapper/gradle-wrapper.properties','vite/android/app/build.gradle') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # 缓存 Maven 本地仓库，加速后端构建
+      - name: 缓存 Maven 仓库
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
       # 步骤 2: 设置 Java 环境
       # 使用 actions/setup-java@v4 Action 安装指定版本的 JDK (这里是 Temurin 21)
       # 配置 Maven 缓存以加速后续构建
@@ -313,10 +333,6 @@ jobs:
 
       # 步骤 19: 构建 Android Release APK
       # (对应 deploy-all.ps1 第 208-227 行)
-
-      # 新步骤：设置 Gradle 环境
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
 
       # 19.1: 设置 Android SDK 环境
       # 使用 android-actions/setup-android@v3 Action 自动下载和配置构建所需的 Android SDK
