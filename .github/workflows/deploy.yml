@@ -90,8 +90,9 @@ jobs:
         run: |
           echo "进入 mine-api 目录..."
           cd mine-api
-          # 确保 mvnw 脚本有执行权限 (在某些环境可能需要)
-          # chmod +x ./mvnw
+          # 赋予 mvnw 脚本执行权限
+          echo "为 mvnw 添加执行权限..."
+          chmod +x ./mvnw
           echo "执行 Maven 构建 (clean package -DskipTests)..."
           ./mvnw clean package -DskipTests
           # 检查上一个命令的退出状态码
