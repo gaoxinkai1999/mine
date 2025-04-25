@@ -60,12 +60,32 @@ function uploadFile(filePath, cosKey) {
 
 // ========== 执行上传 ==========
 async function main() {
+  // 解析命令行参数，确定要上传的文件
+  const args = process.argv.slice(2);
+  const uploadTarget = args.includes('--file') ? args[args.indexOf('--file') + 1] : 'all'; // 'apk', 'version', or 'all'
+
   try {
-    await uploadFile(apkFilePath, apkFilename); // 使用动态 APK 文件名
-    await uploadFile(versionFilePath, 'version.json');
-    console.log('全部文件上传完成');
+    let uploaded = false;
+    if (uploadTarget === 'apk' || uploadTarget === 'all') {
+      console.log(`准备上传 APK: ${apkFilename}...`);
+      await uploadFile(apkFilePath, apkFilename);
+      console.log(`APK (${apkFilename}) 上传成功。`);
+      uploaded = true;
+    }
+    if (uploadTarget === 'version' || uploadTarget === 'all') {
+      console.log(`准备上传 version.json...`);
+      await uploadFile(versionFilePath, 'version.json');
+      console.log(`version.json 上传成功。`);
+      uploaded = true;
+    }
+    if (uploaded) {
+       console.log('指定文件上传完成');
+    } else {
+       console.log(`未指定有效上传目标 ('apk', 'version', 'all') 或未找到文件。`);
+    }
   } catch (error) {
     console.error('上传过程中出错:', error);
+    process.exit(1); // Ensure workflow fails on error
   }
 }
 
