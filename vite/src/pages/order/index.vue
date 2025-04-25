@@ -307,8 +307,8 @@ export default {
   flex-direction: column;
   position: relative;
   width: 100%;
-  height: 100vh;
-  overflow: hidden;
+  height: 100%; /* 填充父容器（App.vue的.main-content）的高度 */
+  /* overflow: hidden; */ /* 由父组件控制滚动 */
   background: linear-gradient(135deg, #f6f9fc 0%, #eef2f5 100%);
 }
 
@@ -441,14 +441,15 @@ export default {
 }
 
 .main-content-area {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1; /* 占据剩余空间 */
+  overflow-y: auto; /* 自身处理滚动 */
   -webkit-overflow-scrolling: touch;
   position: relative;
   background: white;
   border-radius: 24px 24px 0 0;
   margin-top: -12px;
-  padding: 24px 16px calc(50px + env(safe-area-inset-bottom, 0px));
+  /* 底部填充只考虑安全区，Tabbar高度由App.vue的.main-content处理 */
+  padding: 24px 16px env(safe-area-inset-bottom, 0px);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
 }
 

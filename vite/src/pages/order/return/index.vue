@@ -122,8 +122,6 @@ export default {
       actions: [
         {name: '单个操作', subname: '针对当前选中订单的操作', disabled: true}, // 恢复原始标题
         {
-          name: '打印退货单',
-          color: '#07c160',
           name: '打印退货单', // 恢复原始名称
           color: '#07c160',
           callback: () => this.handlePrintOrder()

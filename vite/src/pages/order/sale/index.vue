@@ -109,7 +109,6 @@
             required
             type="number"
             label-width="80px"
-            ref="arrearsField"
           >
             <template #left-icon>
               <van-icon name="balance-o" class="field-icon" />
@@ -135,7 +134,7 @@ import api from "@/api/index.js";
 import {formatReceipt, printOrder} from "@/utils/printService.js";
 import {showFailToast, showSuccessToast, showConfirmDialog, showLoadingToast} from "vant"; // 引入 showLoadingToast
 import {useOrderListStore} from "@/stores/orderList.js";
-import {watch, nextTick} from 'vue'; // 引入 nextTick
+import {watch} from 'vue';
 
 export default {
   name: 'SalesOrderList',
@@ -168,7 +167,6 @@ export default {
       showArrearsPopup: false, // 控制欠款弹窗
       arrearsEditData: null, // 存储欠款编辑数据 { id, name, arrears }
       actions: [
-        {name: '订单操作', subname: '针对当前选中订单的操作', disabled: true},
         {
           name: '打印订单',
           color: '#07c160',
@@ -184,7 +182,6 @@ export default {
           color: '#ee0a24',
           callback: () => this.handleDeleteOrder(this.selectedOrder.id)
         },
-        { name: '商家操作', subname: '针对订单关联商家', disabled: true },
         {
           name: '修改商家欠款',
           color: '#ff976a', // 橙色
@@ -328,10 +325,7 @@ export default {
         arrears: this.selectedOrder.shop.arrears !== undefined ? this.selectedOrder.shop.arrears : 0
       };
       this.showArrearsPopup = true;
-      // 弹窗显示后自动聚焦输入框
-      nextTick(() => {
-          this.$refs.arrearsField?.focus();
-      });
+
     },
     async saveArrears() {
       if (!this.arrearsEditData || this.arrearsEditData.arrears === null || this.arrearsEditData.arrears === undefined || this.arrearsEditData.arrears === '') {

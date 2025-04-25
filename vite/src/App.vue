@@ -189,7 +189,7 @@ html, body {
   flex: 1;
   position: relative;
   width: 100%;
-  overflow: hidden; /* 子页面负责控制各自内容的滚动 */
+  overflow: auto; /* 子页面负责控制各自内容的滚动 */
 }
 
 /* 只有当显示tabbar时才应用底部填充 */
