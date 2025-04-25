@@ -318,7 +318,10 @@ jobs:
       # 使用 android-actions/setup-android@v3 Action 自动下载和配置构建所需的 Android SDK
       - name: 设置 Android SDK 环境
         uses: android-actions/setup-android@v3
-        # 此 Action 会自动处理 SDK 的下载和配置
+        with:
+          # 指定项目使用的 compileSdkVersion
+          api-level: 34
+        # 注意：buildToolsVersion 和 ndkVersion 未在项目中明确指定，暂不设置
 
       # 19.2: (可选) 解码签名密钥库 (Keystore)
       # 仅当提供了所有相关的 Android 签名 Secrets 时才执行此步骤
@@ -368,9 +371,9 @@ jobs:
           fi
 
           # 执行 Gradle 构建命令
-          echo "开始执行 Gradle 构建 (assembleRelease)..."
-          # 将签名属性（如果存在）附加到命令末尾
-          ./gradlew assembleRelease $SIGNING_PROPS
+          echo "开始执行 Gradle 构建 (assembleRelease) 并添加 --stacktrace 获取详细错误信息..."
+          # 将签名属性（如果存在）附加到命令末尾，并添加 --stacktrace
+          ./gradlew assembleRelease $SIGNING_PROPS --stacktrace
 
           if [ $? -ne 0 ]; then
             echo "错误：Android Release APK 构建失败！" >&2
