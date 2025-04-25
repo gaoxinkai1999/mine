@@ -1,5 +1,5 @@
 {
-  "changelog": "\n\n解决布局问题\n新增订单页面的筛选和修改欠款的功能",
+  "changelog": "\n\n解决布局问题\n新增订单页面的筛选和修改欠款的功能\n新建销售订单购物车逻辑的修改\n欠款页面新增排序功能",
   "version": "1.3.5",
   "url": "http://update.abocidee.com/updates/dist.zip",
   "forceDownloadApk": true,
