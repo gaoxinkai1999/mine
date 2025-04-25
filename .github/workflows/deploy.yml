@@ -108,16 +108,26 @@ jobs:
       - name: 设置 Docker 镜像详情环境变量
         run: |
           echo "设置 Docker 相关环境变量..."
-          echo "REGISTRY_URL=crpi-xlafczp8xa83qpr9.cn-beijing.personal.cr.aliyuncs.com" >> $GITHUB_ENV
-          echo "NAMESPACE=gaoxinkai" >> $GITHUB_ENV
-          echo "IMAGE_NAME=myapp" >> $GITHUB_ENV
-          # 组合完整的阿里云镜像标签
-          echo "FULL_IMAGE_TAG=${{ env.REGISTRY_URL }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}" >> $GITHUB_ENV
-          # 本地构建时使用的标签
-          echo "LOCAL_IMAGE_TAG=${{ env.IMAGE_NAME }}:${{ env.VERSION }}" >> $GITHUB_ENV
+          # 定义 Shell 变量 (这些值是固定的或来自上一步的 env.VERSION)
+          REGISTRY_URL_VAL="crpi-xlafczp8xa83qpr9.cn-beijing.personal.cr.aliyuncs.com"
+          NAMESPACE_VAL="gaoxinkai"
+          IMAGE_NAME_VAL="myapp"
+          VERSION_VAL="${{ env.VERSION }}" # VERSION 来自上一步，可以用 env 获取
+
+          # 使用 Shell 变量构造标签
+          FULL_TAG="${REGISTRY_URL_VAL}/${NAMESPACE_VAL}/${IMAGE_NAME_VAL}:${VERSION_VAL}"
+          LOCAL_TAG="${IMAGE_NAME_VAL}:${VERSION_VAL}"
+
+          # 将最终构造好的标签和其他值写入 GITHUB_ENV 供后续步骤使用
+          echo "REGISTRY_URL=${REGISTRY_URL_VAL}" >> $GITHUB_ENV
+          echo "NAMESPACE=${NAMESPACE_VAL}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${IMAGE_NAME_VAL}" >> $GITHUB_ENV
+          echo "FULL_IMAGE_TAG=${FULL_TAG}" >> $GITHUB_ENV
+          echo "LOCAL_IMAGE_TAG=${LOCAL_TAG}" >> $GITHUB_ENV
+
           echo "Docker 环境变量设置完成。"
-          echo "完整镜像标签: ${{ env.REGISTRY_URL }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}"
-          echo "本地镜像标签: ${{ env.IMAGE_NAME }}:${{ env.VERSION }}"
+          echo "完整镜像标签: ${FULL_TAG}"
+          echo "本地镜像标签: ${LOCAL_TAG}"
 
       # 步骤 8: 构建 Docker 镜像
       # 使用 mine-api 目录下的 Dockerfile 构建镜像，并打上本地标签
