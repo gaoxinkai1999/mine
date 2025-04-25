@@ -75,6 +75,21 @@
       </div>
 
 
+      <!-- 结算操作栏 -->
+      <div class="cart-actions-footer">
+        <div class="footer-total-price">
+          合计: <span>¥{{ totalPrice.toFixed(2) }}</span>
+        </div>
+        <van-button
+          class="footer-checkout-btn"
+          type="primary"
+          :disabled="totalCount === 0"
+          @click="handleSubmitOrder"
+        >
+          去结算 ({{ totalCount }})
+        </van-button>
+      </div>
+
       <div class="safe-area-bottom"></div>
     </van-popup>
     <!-- 价格编辑对话框 -->
@@ -100,8 +115,12 @@
 <script setup>
 import {ref} from 'vue';
 import {useOrderStore} from '@/stores/order';
+import { showConfirmDialog } from 'vant'; // Import showConfirmDialog
+import { storeToRefs } from 'pinia'; // Import storeToRefs
 
 const store = useOrderStore();
+const { totalPrice, totalCount } = storeToRefs(store); // Get totalPrice and totalCount
+const { submitOrder } = store; // Get submitOrder action
 
 // 价格编辑相关
 const editingItem = ref(null);
@@ -125,6 +144,30 @@ const updatePrice = () => {
   editingItem.value.price = price;
 
   showPriceEdit.value = false;
+};
+
+// 处理提交订单 (New function)
+const handleSubmitOrder = () => {
+  // 显示确认弹窗
+  showConfirmDialog({
+    title: '确认提交订单',
+    message: `总计金额：¥${totalPrice.value.toFixed(2)}，确定要提交订单吗？`,
+    confirmButtonText: '确认提交',
+    cancelButtonText: '再想想',
+    zIndex: 2800 // Ensure dialog is above popup
+  })
+  .then(() => {
+    // 用户点击确认，执行提交订单
+    // 可以在这里先关闭弹窗，避免用户重复点击
+    store.showCart = false;
+    submitOrder().then(success => {
+      // 可以在成功后执行其他操作，例如跳转页面
+      // if (success) { ... }
+    });
+  })
+  .catch(() => {
+    // 用户取消，不执行任何操作
+  });
 };
 </script>
 
@@ -345,5 +388,35 @@ const updatePrice = () => {
 .safe-area-bottom {
   height: env(safe-area-inset-bottom, 0);
 }
+
+/* 新增结算操作栏样式 */
+.cart-actions-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid #f5f5f5;
+  background-color: #fff; /* Ensure background */
+}
+
+.footer-total-price {
+  font-size: 14px;
+  color: #323233;
+}
+
+.footer-total-price span {
+  font-size: 18px;
+  font-weight: 500;
+  color: #ee0a24;
+  margin-left: 4px;
+}
+
+.footer-checkout-btn {
+  height: 36px;
+  font-weight: 500;
+  border-radius: 18px;
+  min-width: 110px;
+}
+
 </style>
 

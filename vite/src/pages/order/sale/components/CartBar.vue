@@ -10,14 +10,6 @@
       <div v-else class="cart-tip">未选购商品</div>
     </div>
     
-    <van-button 
-      class="checkout-btn" 
-      type="primary" 
-      :disabled="totalCount === 0"
-      @click="store.submitOrder()"
-    >
-      去结算
-    </van-button>
   </div>
 </template>
 

@@ -48,6 +48,19 @@
       <div class="fixed-section list-header-section">
         <div class="list-header">
           <span>商家欠款明细</span>
+          <div class="sort-control" @click="toggleSort('arrears')">
+            <span>金额</span>
+            <van-icon
+              v-if="sortBy === 'arrears'"
+              :name="sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'"
+              class="sort-icon active"
+            />
+            <van-icon
+              v-else
+              name="exchange"
+              class="sort-icon inactive"
+            />
+          </div>
         </div>
       </div>
 
@@ -149,7 +162,9 @@ export default {
       TableData: [],
       show: false,
       newItem: null,
-      searchText: ''
+      searchText: '',
+      sortBy: 'arrears', // 默认按欠款金额排序
+      sortOrder: 'desc' // 默认降序
     }
   },
   computed: {
@@ -157,12 +172,36 @@ export default {
       return this.TableData.reduce((sum, item) => sum + Number(item.arrears), 0).toFixed(2);
     },
     filteredData() {
-      if (!this.searchText) return this.TableData;
-      const searchLower = this.searchText.toLowerCase();
-      return this.TableData.filter(item => 
-        item.name.toLowerCase().includes(searchLower) || 
-        item.location.toLowerCase().includes(searchLower)
-      );
+      let data = this.TableData;
+
+      // 过滤
+      if (this.searchText) {
+        const searchLower = this.searchText.toLowerCase();
+        data = data.filter(item =>
+          item.name.toLowerCase().includes(searchLower) ||
+          item.location.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // 排序
+      if (this.sortBy) {
+        data.sort((a, b) => {
+          let valA = a[this.sortBy];
+          let valB = b[this.sortBy];
+
+          // 特殊处理金额，确保按数字比较
+          if (this.sortBy === 'arrears') {
+            valA = Number(valA);
+            valB = Number(valB);
+          }
+
+          if (valA < valB) return this.sortOrder === 'asc' ? -1 : 1;
+          if (valA > valB) return this.sortOrder === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+
+      return data;
     }
   },
   mounted() {
@@ -231,6 +270,16 @@ export default {
       .catch(() => {
         // 用户取消，无需操作
       });
+    },
+    toggleSort(field) {
+      if (this.sortBy === field) {
+        // 如果已经是当前排序字段，切换排序方向
+        this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        // 如果切换到新的排序字段，默认降序 (或根据需要设为升序)
+        this.sortBy = field;
+        this.sortOrder = 'desc';
+      }
     }
   }
 }
@@ -339,12 +388,52 @@ export default {
 
 /* 列表标题样式 */
 .list-header {
-  padding: 14px 16px;
+  display: flex; /* 使标题和排序控件在同一行 */
+  justify-content: space-between; /* 将标题和排序控件分开 */
+  align-items: center; /* 垂直居中对齐 */
+  padding: 14px 12px 14px 16px; /* 微调内边距以适应排序控件 */
   font-size: 16px;
   font-weight: 500;
   background: white;
   border-radius: 12px 12px 0 0;
   border-bottom: 1px solid #f5f5f5;
+}
+
+/* 排序控件样式 */
+.sort-control {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #646566; /* Vant 次要文字颜色 */
+  font-size: 14px;
+  padding: 6px 8px; /* 调整内边距 */
+  border-radius: 16px; /* 更圆的胶囊形状 */
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sort-control:hover {
+  background-color: #f2f3f5; /* Vant 浅灰色背景 */
+}
+
+.sort-control:active {
+  background-color: #ebedf0; /* Vant 点击态灰色背景 */
+}
+
+.sort-control span {
+  margin-right: 5px; /* 图标和文字间距 */
+}
+
+.sort-icon {
+  font-size: 15px; /* 稍微调整图标大小 */
+  transition: color 0.2s;
+}
+
+.sort-icon.inactive {
+  color: #c8c9cc; /* Vant 禁用颜色 */
+}
+
+.sort-icon.active {
+  color: var(--van-primary-color, #1989fa); /* 使用 Vant 主题色 */
 }
 
 /* 商家列表样式 */
@@ -540,3 +629,4 @@ export default {
   }
 }
 </style>
+/* 样式已被移动到正确的 .list-header 定义中 */

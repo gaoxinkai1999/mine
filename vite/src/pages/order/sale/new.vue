@@ -53,36 +53,16 @@ import ProductList from './components/ProductList.vue'
 import CartBar from './components/CartBar.vue'
 import CartPopup from './components/CartPopup.vue'
 import { onMounted, onBeforeUnmount } from 'vue'
-import { showConfirmDialog } from 'vant'
-
 const router = useRouter()
 const store = useOrderStore()
 
 // 从 store 获取响应式状态
-const { showCart } = storeToRefs(store)
+const { showCart, totalPrice } = storeToRefs(store) // 添加 totalPrice
 const { init, submitOrder } = store
 
 // 返回上一页
 const goBack = () => {
   router.back()
-}
-
-// 处理提交订单
-const handleSubmitOrder = () => {
-  // 显示确认弹窗
-  showConfirmDialog({
-    title: '确认提交订单',
-    message: `总计金额：¥${totalPrice.value.toFixed(2)}，确定要提交订单吗？`,
-    confirmButtonText: '确认提交',
-    cancelButtonText: '再想想'
-  })
-  .then(() => {
-    // 用户点击确认，执行提交订单
-    submitOrder()
-  })
-  .catch(() => {
-    // 用户取消，不执行任何操作
-  })
 }
 
 // 生命周期钩子

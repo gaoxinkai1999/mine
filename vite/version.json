@@ -1,6 +1,6 @@
 {
-  "changelog": "\n\n修复时区问题\n新增批次的修改",
-  "version": "1.3.4",
+  "changelog": "\n\n解决布局问题\n新增订单页面的筛选和修改欠款的功能",
+  "version": "1.3.5",
   "url": "http://update.abocidee.com/updates/dist.zip",
   "forceDownloadApk": true,
   "apkUrl": "https://cdn.abocidee.com/app-release.apk"
