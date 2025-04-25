@@ -26,7 +26,8 @@ const Bucket = '1-1317280880';
 const Region = 'ap-beijing';
 
 // 本地APK文件路径
-const apkFilePath = path.resolve(__dirname, 'app-release.apk');
+const apkFilename = process.env.APK_NAME || 'app-release.apk';
+const apkFilePath = path.resolve(__dirname, apkFilename);
 // 本地版本描述文件路径
 const versionFilePath = path.resolve(__dirname, 'version.json');
 
@@ -60,7 +61,7 @@ function uploadFile(filePath, cosKey) {
 // ========== 执行上传 ==========
 async function main() {
   try {
-    await uploadFile(apkFilePath, 'app-release.apk'); // 可改为 'apk/app-release.apk' 指定子目录
+    await uploadFile(apkFilePath, apkFilename); // 使用动态 APK 文件名
     await uploadFile(versionFilePath, 'version.json');
     console.log('全部文件上传完成');
   } catch (error) {
