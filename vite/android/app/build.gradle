@@ -20,10 +20,11 @@ android {
         
         release {
             // 正式环境签名信息
-            storeFile file("C:\\Users\\g\\Desktop\\key\\gao.jks")  // 实际keystore文件路径
-            storePassword "miaoshidahu"
-            keyAlias "gao"
-            keyPassword "miaoshidahu"
+            // 使用 CI 解码生成的 keystore 文件
+            storeFile file("release.keystore")
+            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD_ENV")
+            keyAlias System.getenv("ANDROID_KEY_ALIAS_ENV")
+            keyPassword System.getenv("ANDROID_KEY_PASSWORD_ENV")
             
             // 更安全的方式是使用环境变量或属性文件获取密码
             // storePassword System.getenv("RELEASE_STORE_PASSWORD") 
