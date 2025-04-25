@@ -453,6 +453,40 @@ jobs:
           fi
           echo "成功上传到腾讯云 COS。"
 
+      # 步骤 20.1: 更新 version.json 中的 apkUrl 并重新上传
+      - name: 更新并重新上传 version.json (包含 apkUrl)
+        # 仅当 COS 上传步骤成功且 APK_NAME 有效时执行
+        if: success() && env.COS_SECRET_ID != '' && env.COS_SECRET_KEY != '' && env.APK_NAME != ''
+        working-directory: ${{ env.FRONTEND_DIR }} # 在 vite 目录下执行
+        env: # 传递 COS 配置给脚本
+          COS_SECRET_ID: ${{ env.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ env.COS_SECRET_KEY }}
+          # 定义 COS Bucket 和 Region (需要与 upload-to-cos.cjs 中的配置一致)
+          COS_BUCKET: '1-1317280880' # 请替换为你的 Bucket 名称
+          COS_REGION: 'ap-beijing'   # 请替换为你的 Region
+        run: |
+          echo "准备更新 version.json 中的 apkUrl..."
+          VERSION_FILE="version.json"
+          APK_URL="https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com/${{ env.APK_NAME }}"
+          echo "新的 APK URL: $APK_URL"
+
+          # 使用 jq 更新 apkUrl 字段
+          jq --arg url "$APK_URL" '.apkUrl = $url' $VERSION_FILE > temp_version.json && mv temp_version.json $VERSION_FILE
+          if [ $? -ne 0 ]; then
+             echo "错误：使用 jq 更新 $VERSION_FILE 失败！" >&2
+             exit 1
+          fi
+          echo "$VERSION_FILE 中的 apkUrl 已更新。"
+
+          # 重新上传更新后的 version.json
+          echo "重新上传更新后的 $VERSION_FILE 到 COS..."
+          node upload-to-cos.cjs --file version # 调用脚本只上传 version.json
+          if [ $? -ne 0 ]; then
+            echo "错误：重新上传 $VERSION_FILE 失败！" >&2
+            exit 1
+          fi
+          echo "更新后的 $VERSION_FILE 已成功上传到 COS。"
+
       # 步骤 21: 恢复 capacitor.config.json 中的 server.url
       # 构建完成后，将 server.url 恢复为开发环境的地址，以便本地开发不受影响
       # (对应 deploy-all.ps1 第 243-260 行)
