@@ -55,7 +55,7 @@ Invoke-DeployScript -ScriptPath $PublishScript -StepName "应用发布 (上传�
 Pop-Location # 返回执行前的目录
 
 # 从 config.ps1 获取版本号用于最终消息
-. "$PSScriptRoot/config.ps1" # 再次加载以获取 $Script:VERSION
+$config = . "$PSScriptRoot/config.ps1" # 再次加载以获取配置哈希表
 
-Write-Host "==== 全部部署步骤成功完成！后端版本号：$($Script:VERSION)，前端APK已构建并上传至腾讯云COS ====" -ForegroundColor Magenta
+Write-Host "==== 全部部署步骤成功完成！后端版本号：$($config.VERSION)，前端APK已构建并上传至腾讯云COS ====" -ForegroundColor Magenta # 使用 $config.VERSION
 Write-Host "请注意检查各个步骤的详细日志输出。"

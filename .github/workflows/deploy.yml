@@ -1,0 +1,449 @@
+# GitHub Actions 工作流程：用于部署后端 Spring Boot 应用和前端 Vite/Capacitor 应用
+
+name: 部署前后端应用
+
+# 控制工作流程的触发时机
+on:
+  workflow_dispatch:    # 只允许在 GitHub Actions UI 手动触发
+
+jobs:
+  # 定义一个名为 'deploy' 的作业
+  deploy:
+    # 指定运行此作业的虚拟机环境
+    runs-on: ubuntu-latest # 使用最新的 Ubuntu 虚拟机
+    # 定义作业级别的环境变量，这些变量可以被作业中的所有步骤访问
+    # 通常用于存储从 Secrets 获取的值或在步骤间共享的配置
+    env:
+      # 阿里云 Docker Registry 凭证 (从 GitHub Secrets 获取)
+      ALIYUN_DOCKER_USERNAME: ${{ secrets.ALIYUN_DOCKER_USERNAME }}
+      ALIYUN_DOCKER_PASSWORD: ${{ secrets.ALIYUN_DOCKER_PASSWORD }}
+      # 部署目标服务器信息 (从 GitHub Secrets 获取)
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }} # SSH 私钥内容
+      SERVER_PORT_MAP: ${{ secrets.SERVER_PORT_MAP }} # 服务器端口映射 (例如 "9850:8085")
+      # Android 应用签名相关 Secrets (从 GitHub Secrets 获取)
+      # 注意：这些是可选的，仅在需要构建签名的 Release APK 时需要提供
+      ANDROID_KEYSTORE_BASE64_ENV: ${{ secrets.ANDROID_KEYSTORE_BASE64 }} # Base64 编码的 keystore 文件内容
+      ANDROID_KEYSTORE_PASSWORD_ENV: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }} # Keystore 密码
+      ANDROID_KEY_ALIAS_ENV: ${{ secrets.ANDROID_KEY_ALIAS }}       # 密钥别名
+      ANDROID_KEY_PASSWORD_ENV: ${{ secrets.ANDROID_KEY_PASSWORD }}    # 密钥密码
+      # 腾讯云 COS 相关 Secrets (从 GitHub Secrets 获取)
+      # 注意：这些是可选的，仅在需要执行上传到 COS 的步骤时需要提供
+      COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+      COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+
+    # 定义作业中的各个步骤
+    steps:
+      # 步骤 1: 检出代码
+      # 使用 actions/checkout@v4 Action 将仓库代码下载到虚拟机的 $GITHUB_WORKSPACE 目录
+      - name: 检出代码仓库
+        uses: actions/checkout@v4
+
+      # 步骤 2: 设置 Java 环境
+      # 使用 actions/setup-java@v4 Action 安装指定版本的 JDK (这里是 Temurin 21)
+      # 配置 Maven 缓存以加速后续构建
+      - name: 设置 JDK 21 环境
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'        # 指定 Java 版本为 21
+          distribution: 'temurin'   # 指定 Java 发行版
+          cache: maven              # 启用 Maven 依赖缓存
+
+      # 步骤 3: 设置 Node.js 环境
+      # 使用 actions/setup-node@v4 Action 安装指定版本的 Node.js (这里是 22)
+      # 配置 npm 缓存以加速依赖安装
+      - name: 设置 Node.js 22 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'        # 指定 Node.js 版本为 22 (对应 v22.x)
+          cache: 'npm'              # 启用 npm 依赖缓存
+          cache-dependency-path: '**/package-lock.json' # 指定缓存依赖的文件 (如果是 yarn 或 pnpm，请修改)
+
+      # 步骤 4: 安装 jq 工具
+      # jq 是一个轻量级的命令行 JSON 处理工具，用于后续步骤中解析 JSON 文件
+      - name: 安装 jq (JSON 处理工具)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # --- 后端部署步骤 (对应 deploy-all.ps1 脚本逻辑) ---
+
+      # 步骤 5: 从 vite/version.json 读取版本号
+      # 使用 jq 读取版本号，并将其设置为后续步骤可用的环境变量 GITHUB_ENV.VERSION
+      # 如果读取失败，则输出错误并使 Workflow 失败
+      - name: 读取前端版本号 (vite/version.json)
+        id: version # 给这个步骤设置一个 ID，以便后续引用其输出 (虽然这里没用到输出)
+        run: |
+          VERSION=$(jq -r '.version' vite/version.json)
+          if [ -z "$VERSION" ]; then
+            echo "错误：无法从 vite/version.json 读取版本号！" >&2 # 输出到 stderr
+            exit 1
+          fi
+          # 将版本号写入 GITHUB_ENV，使其成为后续步骤的环境变量 ${{ env.VERSION }}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "成功读取版本号: $VERSION"
+
+      # 步骤 6: 构建后端 Spring Boot JAR 包
+      # 切换到 mine-api 目录，执行 Maven clean 和 package 命令 (跳过测试)
+      # 检查 Maven 命令的退出码，如果非 0 则构建失败
+      # (对应 deploy-all.ps1 第 45-54 行)
+      - name: 使用 Maven 构建后端 JAR 包 (mine-api)
+        run: |
+          echo "进入 mine-api 目录..."
+          cd mine-api
+          # 确保 mvnw 脚本有执行权限 (在某些环境可能需要)
+          # chmod +x ./mvnw
+          echo "执行 Maven 构建 (clean package -DskipTests)..."
+          ./mvnw clean package -DskipTests
+          # 检查上一个命令的退出状态码
+          if [ $? -ne 0 ]; then
+            echo "错误：Maven 构建失败！" >&2
+            exit 1
+          fi
+          echo "Maven 构建成功。"
+          cd .. # 返回工作区根目录
+
+      # 步骤 7: 设置 Docker 镜像相关信息
+      # 将镜像仓库地址、命名空间、镜像名和标签等信息设置为环境变量，方便后续引用
+      - name: 设置 Docker 镜像详情环境变量
+        run: |
+          echo "设置 Docker 相关环境变量..."
+          echo "REGISTRY_URL=crpi-xlafczp8xa83qpr9.cn-beijing.personal.cr.aliyuncs.com" >> $GITHUB_ENV
+          echo "NAMESPACE=gaoxinkai" >> $GITHUB_ENV
+          echo "IMAGE_NAME=myapp" >> $GITHUB_ENV
+          # 组合完整的阿里云镜像标签
+          echo "FULL_IMAGE_TAG=${{ env.REGISTRY_URL }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}" >> $GITHUB_ENV
+          # 本地构建时使用的标签
+          echo "LOCAL_IMAGE_TAG=${{ env.IMAGE_NAME }}:${{ env.VERSION }}" >> $GITHUB_ENV
+          echo "Docker 环境变量设置完成。"
+          echo "完整镜像标签: ${{ env.REGISTRY_URL }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}"
+          echo "本地镜像标签: ${{ env.IMAGE_NAME }}:${{ env.VERSION }}"
+
+      # 步骤 8: 构建 Docker 镜像
+      # 使用 mine-api 目录下的 Dockerfile 构建镜像，并打上本地标签
+      # (对应 deploy-all.ps1 第 56-66 行)
+      - name: 构建 Docker 镜像 (使用 mine-api/Dockerfile)
+        run: |
+          echo "开始构建 Docker 镜像: ${{ env.LOCAL_IMAGE_TAG }}"
+          docker build -t ${{ env.LOCAL_IMAGE_TAG }} ./mine-api
+          if [ $? -ne 0 ]; then
+            echo "错误：Docker 镜像构建失败！" >&2
+            exit 1
+          fi
+          echo "Docker 镜像构建成功。"
+
+      # 步骤 9: 给 Docker 镜像打上远程仓库标签
+      # 将本地构建好的镜像标记为要推送到阿里云仓库的完整标签
+      # (对应 deploy-all.ps1 第 68-78 行)
+      - name: 为 Docker 镜像打上远程仓库标签
+        run: |
+          echo "为镜像 ${{ env.LOCAL_IMAGE_TAG }} 打上标签: ${{ env.FULL_IMAGE_TAG }}"
+          docker tag ${{ env.LOCAL_IMAGE_TAG }} ${{ env.FULL_IMAGE_TAG }}
+          if [ $? -ne 0 ]; then
+            echo "错误：Docker 镜像打标签失败！" >&2
+            exit 1
+          fi
+          echo "Docker 镜像打标签成功。"
+
+      # 步骤 10: 登录阿里云 Docker Registry
+      # 使用 docker/login-action@v3 Action 安全地登录到阿里云镜像仓库
+      # 需要提供仓库地址、用户名和密码 (通过环境变量从 Secrets 获取)
+      # (对应 deploy-all.ps1 第 80-90 行)
+      - name: 登录到阿里云 Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_URL }}               # 仓库地址
+          username: ${{ env.ALIYUN_DOCKER_USERNAME }}    # 用户名 (来自 Secret)
+          password: ${{ env.ALIYUN_DOCKER_PASSWORD }}    # 密码 (来自 Secret)
+
+      # 步骤 11: 推送 Docker 镜像到阿里云仓库
+      # 将带有完整标签的镜像推送到远程仓库
+      # (对应 deploy-all.ps1 第 92-102 行)
+      - name: 推送 Docker 镜像到阿里云 Registry
+        run: |
+          echo "开始推送镜像: ${{ env.FULL_IMAGE_TAG }}"
+          docker push ${{ env.FULL_IMAGE_TAG }}
+          if [ $? -ne 0 ]; then
+            echo "错误：Docker 镜像推送失败！" >&2
+            exit 1
+          fi
+          echo "Docker 镜像推送成功。"
+
+      # 步骤 12: 通过 SSH 部署到目标服务器
+      # 使用 appleboy/ssh-action@master Action 连接到服务器执行部署命令
+      # 需要提供服务器 IP、用户名和 SSH 私钥 (通过环境变量从 Secrets 获取)
+      # (对应 deploy-all.ps1 第 104-117 行)
+      - name: 通过 SSH 连接服务器并部署 Docker 容器
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.SERVER_IP }}         # 服务器 IP (来自 Secret)
+          username: ${{ env.SERVER_USER }}     # 服务器用户名 (来自 Secret)
+          key: ${{ env.SSH_PRIVATE_KEY }}    # SSH 私钥内容 (来自 Secret)
+          port: 22                           # SSH 端口 (默认为 22，如果不同请修改)
+          # 在远程服务器上执行的脚本
+          script: |
+            echo "在服务器 ${{ env.SERVER_IP }} 上执行部署脚本..."
+            # 1. 在服务器上登录阿里云 Docker Registry
+            echo "登录 Docker Registry..."
+            docker login ${{ env.REGISTRY_URL }} -u ${{ env.ALIYUN_DOCKER_USERNAME }} -p ${{ env.ALIYUN_DOCKER_PASSWORD }}
+            if [ $? -ne 0 ]; then echo "错误：在服务器上登录 Docker Registry 失败！" >&2; exit 1; fi
+
+            # 2. 拉取最新的 Docker 镜像
+            echo "拉取最新镜像: ${{ env.FULL_IMAGE_TAG }}"
+            docker pull ${{ env.FULL_IMAGE_TAG }}
+            if [ $? -ne 0 ]; then echo "错误：在服务器上拉取 Docker 镜像失败！" >&2; exit 1; fi
+
+            # 3. 停止当前运行的同名容器 (如果存在)
+            # 使用 || true 忽略容器不存在时的错误
+            echo "停止旧容器 (如果存在): ${{ env.IMAGE_NAME }}"
+            docker stop ${{ env.IMAGE_NAME }} || true
+
+            # 4. 删除已停止的同名容器 (如果存在)
+            # 使用 || true 忽略容器不存在时的错误
+            echo "删除旧容器 (如果存在): ${{ env.IMAGE_NAME }}"
+            docker rm ${{ env.IMAGE_NAME }} || true
+
+            # 5. 运行新的 Docker 容器
+            echo "启动新容器: ${{ env.IMAGE_NAME }} 端口映射: ${{ env.SERVER_PORT_MAP }}"
+            docker run -d -p ${{ env.SERVER_PORT_MAP }} --name ${{ env.IMAGE_NAME }} ${{ env.FULL_IMAGE_TAG }}
+            if [ $? -ne 0 ]; then echo "错误：在服务器上运行 Docker 容器失败！" >&2; exit 1; fi
+
+            echo "服务器 ${{ env.SERVER_IP }} 上的部署成功完成。"
+
+      # --- 前端部署步骤 (对应 deploy-all.ps1 脚本逻辑) ---
+
+      # 步骤 13: 设置前端项目工作目录环境变量
+      - name: 设置前端工作目录 (vite)
+        run: echo "FRONTEND_DIR=vite" >> $GITHUB_ENV
+
+      # 步骤 14: 修改 capacitor.config.json (移除 server.url)
+      # 为生产环境构建做准备，移除用于本地开发的 server.url 字段
+      # 使用 jq 工具操作 JSON 文件
+      # (对应 deploy-all.ps1 第 126-143 行)
+      - name: 准备生产环境：移除 capacitor.config.json 中的 server.url
+        working-directory: ${{ env.FRONTEND_DIR }} # 指定此步骤的工作目录为 vite
+        run: |
+          CONFIG_FILE="capacitor.config.json"
+          echo "检查 $CONFIG_FILE 中的 server.url..."
+          # jq -e '.server.url' 会在字段存在时返回 0，不存在时返回非 0
+          if jq -e '.server.url' $CONFIG_FILE > /dev/null; then
+            echo "找到 server.url，正在移除..."
+            # 使用 jq 删除字段，并将结果写入临时文件，然后覆盖原文件
+            jq 'del(.server.url)' $CONFIG_FILE > temp.json && mv temp.json $CONFIG_FILE
+            echo "server.url 已成功移除。"
+          else
+            echo "server.url 不存在于 $CONFIG_FILE，跳过移除。"
+          fi
+
+      # 步骤 15: 同步 Android 版本号和版本名
+      # 从之前读取的 VERSION 环境变量获取版本名 (versionName)
+      # 根据版本名计算版本号 (versionCode)
+      # 使用 sed 命令修改 android/app/build.gradle 文件中的对应字段
+      # (对应 deploy-all.ps1 第 145-177 行)
+      - name: 同步 Android 原生版本信息 (build.gradle)
+        working-directory: ${{ env.FRONTEND_DIR }} # 指定工作目录为 vite
+        run: |
+          VERSION_NAME=${{ env.VERSION }} # 使用之前读取的版本号作为 versionName
+          echo "准备同步 Android 版本信息，VersionName: $VERSION_NAME"
+
+          # 计算 versionCode (规则：主版本号 * 10000 + 次版本号 * 100 + 修订号)
+          IFS='.' read -r -a VERSION_PARTS <<< "$VERSION_NAME" # 按 '.' 分割版本号
+          MAJOR=${VERSION_PARTS[0]:-0} # 获取主版本号，默认为 0
+          MINOR=${VERSION_PARTS[1]:-0} # 获取次版本号，默认为 0
+          PATCH=${VERSION_PARTS[2]:-0} # 获取修订号，默认为 0
+          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+          echo "计算得到的 VersionCode: $VERSION_CODE"
+
+          GRADLE_FILE="android/app/build.gradle"
+          echo "开始修改 $GRADLE_FILE ..."
+          # 使用 sed 进行原地替换 (-i)
+          # 注意：这里的正则表达式假设了 build.gradle 中版本号的格式，如果格式不同可能需要调整
+          sed -i "s/versionName \".*\"/versionName \"$VERSION_NAME\"/" $GRADLE_FILE
+          sed -i "s/versionCode .*/versionCode $VERSION_CODE/" $GRADLE_FILE
+          # 检查 sed 是否成功执行 (虽然 sed -i 通常不直接报错，但可以检查文件内容变化)
+          echo "$GRADLE_FILE 更新完成。"
+
+      # 步骤 16: 安装前端依赖
+      # 切换到前端目录，使用 npm ci 安装依赖 (ci 通常比 install 更快且更适合 CI 环境)
+      # (对应 deploy-all.ps1 第 182-193 行的一部分)
+      - name: 安装前端项目依赖 (npm ci)
+        working-directory: ${{ env.FRONTEND_DIR }} # 指定工作目录为 vite
+        run: |
+          echo "开始安装 npm 依赖..."
+          npm ci
+          echo "npm 依赖安装完成。"
+
+      # 步骤 17: 构建前端项目
+      # 执行 npm run build 命令，并指定 mode 为 production
+      # (对应 deploy-all.ps1 第 182-193 行的一部分)
+      - name: 构建前端项目 (npm run build --mode production)
+        working-directory: ${{ env.FRONTEND_DIR }} # 指定工作目录为 vite
+        run: |
+          echo "开始构建前端项目 (生产模式)..."
+          npm run build -- --mode production
+          if [ $? -ne 0 ]; then
+            echo "错误：前端项目构建失败！" >&2
+            exit 1
+          fi
+          echo "前端项目构建成功。"
+
+      # 步骤 18: Capacitor 同步
+      # 运行 npx cap sync 命令，将 Web 代码同步到原生平台 (Android)
+      # (对应 deploy-all.ps1 第 195-206 行)
+      - name: 执行 Capacitor 同步 (npx cap sync)
+        working-directory: ${{ env.FRONTEND_DIR }} # 指定工作目录为 vite
+        run: |
+          echo "开始执行 Capacitor 同步..."
+          npx cap sync
+          if [ $? -ne 0 ]; then
+            echo "错误：Capacitor 同步失败！" >&2
+            exit 1
+          fi
+          echo "Capacitor 同步成功。"
+
+      # 步骤 19: 构建 Android Release APK
+      # (对应 deploy-all.ps1 第 208-227 行)
+
+      # 19.1: 设置 Android SDK 环境
+      # 使用 android-actions/setup-android@v3 Action 自动下载和配置构建所需的 Android SDK
+      - name: 设置 Android SDK 环境
+        uses: android-actions/setup-android@v3
+        # 此 Action 会自动处理 SDK 的下载和配置
+
+      # 19.2: (可选) 解码签名密钥库 (Keystore)
+      # 仅当提供了所有相关的 Android 签名 Secrets 时才执行此步骤
+      # 将 Base64 编码的 Keystore 内容解码并保存为 release.keystore 文件
+      - name: 解码 Android 签名密钥库 (如果提供了 Secrets)
+        # 仅当所有签名相关的环境变量都非空时执行
+        if: ${{ env.ANDROID_KEYSTORE_BASE64_ENV != '' && env.ANDROID_KEYSTORE_PASSWORD_ENV != '' && env.ANDROID_KEY_ALIAS_ENV != '' && env.ANDROID_KEY_PASSWORD_ENV != '' }}
+        working-directory: ${{ env.FRONTEND_DIR }}/android/app # Keystore 文件通常放在 app 目录下
+        run: |
+          echo "检测到 Android 签名 Secrets，开始解码 Keystore..."
+          echo "${{ env.ANDROID_KEYSTORE_BASE64_ENV }}" | base64 --decode > release.keystore
+          if [ $? -ne 0 ]; then
+            echo "错误：解码 Keystore 失败！请检查 ANDROID_KEYSTORE_BASE64 Secret 内容。" >&2
+            # 不退出，允许后续尝试无签名构建，但会警告
+          else
+            echo "Keystore 已成功解码到: $(pwd)/release.keystore"
+          fi
+        # 注意：确保 ANDROID_KEYSTORE_BASE64 Secret 包含的是正确的 Base64 编码后的 keystore 文件内容
+
+      # 19.3: 使用 Gradle 构建 Release APK
+      # 切换到 android 目录，确保 gradlew 可执行
+      # 如果 Keystore 文件存在且密码等信息可用，则准备签名参数传递给 Gradle
+      # 执行 ./gradlew assembleRelease 命令进行构建
+      - name: 使用 Gradle 构建 Android Release APK
+        working-directory: ${{ env.FRONTEND_DIR }}/android # Gradle 命令需要在 android 目录下执行
+        run: |
+          echo "进入 Android 项目目录: $(pwd)"
+          # 确保 gradlew 脚本有执行权限
+          chmod +x ./gradlew
+
+          # 准备 Gradle 签名参数 (如果 Keystore 和密码可用)
+          SIGNING_PROPS=""
+          # 检查 Keystore 文件是否存在，并且相关的密码/别名环境变量已设置
+          if [ -f "app/release.keystore" ] && \
+             [ "${{ env.ANDROID_KEYSTORE_PASSWORD_ENV }}" != "" ] && \
+             [ "${{ env.ANDROID_KEY_ALIAS_ENV }}" != "" ] && \
+             [ "${{ env.ANDROID_KEY_PASSWORD_ENV }}" != "" ]; then
+            echo "检测到 Keystore 文件和签名配置，将使用签名构建。"
+            # 将签名信息作为 Gradle 属性传递
+            # 注意：属性名称 (android.injected...) 可能需要根据你的 build.gradle 配置调整
+            SIGNING_PROPS="-Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+                           -Pandroid.injected.signing.store.password=${{ env.ANDROID_KEYSTORE_PASSWORD_ENV }} \
+                           -Pandroid.injected.signing.key.alias=${{ env.ANDROID_KEY_ALIAS_ENV }} \
+                           -Pandroid.injected.signing.key.password=${{ env.ANDROID_KEY_PASSWORD_ENV }}"
+          else
+            echo "警告：未找到 Keystore 文件或签名配置不完整。将尝试进行无签名构建 (可能失败或生成未签名的 APK)。"
+          fi
+
+          # 执行 Gradle 构建命令
+          echo "开始执行 Gradle 构建 (assembleRelease)..."
+          # 将签名属性（如果存在）附加到命令末尾
+          ./gradlew assembleRelease $SIGNING_PROPS
+
+          if [ $? -ne 0 ]; then
+            echo "错误：Android Release APK 构建失败！" >&2
+            exit 1
+          fi
+          echo "Android Release APK 构建成功。"
+
+      # 19.4: 复制构建好的 APK 到前端项目根目录
+      # 将生成的 app-release.apk 文件复制到 vite 目录下，并重命名以包含版本号
+      # 将最终的 APK 文件名存入环境变量 GITHUB_ENV.APK_NAME，供后续上传步骤使用
+      - name: 复制并重命名 APK 文件
+        working-directory: ${{ env.FRONTEND_DIR }} # 在 vite 目录下执行
+        run: |
+          APK_SOURCE_PATH="android/app/build/outputs/apk/release/app-release.apk" # Gradle 默认输出路径
+          APK_DEST_NAME="app-release-${{ env.VERSION }}.apk" # 目标文件名包含版本号
+          echo "准备从 $APK_SOURCE_PATH 复制 APK 到 ./$APK_DEST_NAME"
+          if [ -f "$APK_SOURCE_PATH" ]; then
+            cp "$APK_SOURCE_PATH" "./$APK_DEST_NAME"
+            echo "APK 已成功复制到: $(pwd)/$APK_DEST_NAME"
+            # 将最终的 APK 文件名写入 GITHUB_ENV，供后续步骤使用
+            echo "APK_NAME=$APK_DEST_NAME" >> $GITHUB_ENV
+          else
+            echo "错误：未在预期路径找到构建好的 APK 文件 ($APK_SOURCE_PATH)！" >&2
+            exit 1
+          fi
+
+      # 步骤 20: (可选) 上传 APK 和版本信息到腾讯云 COS
+      # 仅当提供了 COS Secrets 且成功构建了 APK 时执行
+      # 运行项目中的 upload-to-cos.cjs 脚本来执行上传操作
+      # (对应 deploy-all.ps1 第 229-241 行)
+      - name: 上传 APK 到腾讯云 COS (如果配置了 Secrets)
+        # 仅当 COS 凭证和 APK 文件名都有效时执行
+        if: env.COS_SECRET_ID != '' && env.COS_SECRET_KEY != '' && env.APK_NAME != ''
+        working-directory: ${{ env.FRONTEND_DIR }} # 在 vite 目录下执行脚本
+        env: # 将 COS 凭证作为环境变量传递给 Node.js 脚本
+          COS_SECRET_ID: ${{ env.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ env.COS_SECRET_KEY }}
+          # 如果 upload-to-cos.cjs 脚本需要明确知道 APK 文件名，可以取消下面的注释
+          # APK_TO_UPLOAD: ${{ env.APK_NAME }}
+        run: |
+          echo "检测到 COS 配置，准备使用 upload-to-cos.cjs 上传 ${{ env.APK_NAME }}..."
+          # 确保 Node.js 脚本存在
+          if [ ! -f "upload-to-cos.cjs" ]; then
+             echo "错误：未找到上传脚本 upload-to-cos.cjs！" >&2
+             exit 1
+          fi
+          # 执行上传脚本
+          node upload-to-cos.cjs
+          if [ $? -ne 0 ]; then
+            echo "错误：执行 upload-to-cos.cjs 上传失败！" >&2
+            exit 1
+          fi
+          echo "成功上传到腾讯云 COS。"
+
+      # 步骤 21: 恢复 capacitor.config.json 中的 server.url
+      # 构建完成后，将 server.url 恢复为开发环境的地址，以便本地开发不受影响
+      # (对应 deploy-all.ps1 第 243-260 行)
+      - name: 清理：恢复 capacitor.config.json 中的 server.url 为开发地址
+        # 无论前面的步骤是否失败，都尝试执行此清理步骤 (可选，根据需要调整)
+        # if: always()
+        working-directory: ${{ env.FRONTEND_DIR }} # 在 vite 目录下执行
+        run: |
+          CONFIG_FILE="capacitor.config.json"
+          # 从原脚本硬编码获取开发服务器地址
+          DEV_URL="http://192.168.0.102:5173"
+          echo "准备将 $CONFIG_FILE 中的 server.url 恢复为开发地址: $DEV_URL"
+          # 使用 jq 添加或更新 server.url 字段
+          # --arg 将 shell 变量传递给 jq
+          jq --arg url "$DEV_URL" '.server.url = $url' $CONFIG_FILE > temp.json && mv temp.json $CONFIG_FILE
+          if [ $? -ne 0 ]; then
+             echo "警告：恢复 $CONFIG_FILE 中的 server.url 失败。" >&2
+             # 这里不 exit 1，因为这只是清理步骤
+          else
+             echo "$CONFIG_FILE 中的 server.url 已恢复。"
+          fi
+
+      # 步骤 22: 标记 Workflow 完成
+      - name: 工作流程执行完毕
+        run: |
+          echo "所有部署步骤已成功完成！"
+          echo "后端版本: ${{ env.VERSION }}"
+          # 检查 APK_NAME 环境变量是否已设置 (仅在 APK 复制成功时设置)
+          if [ -n "${{ env.APK_NAME }}" ]; then
+            echo "前端 APK (已构建): ${{ env.APK_NAME }}"
+          else
+            echo "前端 APK: 未构建或构建/复制失败"
+          fi

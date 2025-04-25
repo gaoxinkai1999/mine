@@ -1,14 +1,14 @@
 # deploy_refactored/publish-app.ps1
 # 负责将构建好的 APK 和版本信息上传到腾讯云 COS
 
-# 加载配置
-. "$PSScriptRoot/config.ps1"
+# 加载配置并捕获返回的哈希表
+$config = . "$PSScriptRoot/config.ps1"
 
-# 检查必要的配置是否存在
-if (-not $Script:VERSION) { Write-Host "错误：版本号未在 config.ps1 中加载。" -ForegroundColor Red; exit 1 }
-if (-not $Script:COS_SECRET_ID -or -not $Script:COS_SECRET_KEY) {
+# 检查必要的配置是否存在 (从哈希表读取)
+if (-not $config.VERSION) { Write-Host "错误：版本号未在 config.ps1 中加载。" -ForegroundColor Red; exit 1 }
+if (-not $config.COS_SECRET_ID -or -not $config.COS_SECRET_KEY) {
     Write-Host "错误：COS Secret ID 或 Secret Key 未在 config.ps1 中加载或从 .env.cos 文件读取。" -ForegroundColor Red
-    Write-Host "请确保 vite/.env.cos 文件存在且包含正确的 COS_SECRET_ID 和 COS_SECRET_KEY。" -ForegroundColor Red
+    Write-Host "请确保 $($config.ENV_PATH) 文件存在且包含正确的 COS_SECRET_ID 和 COS_SECRET_KEY。" -ForegroundColor Red # 使用 $config.ENV_PATH
     Pause
     exit 1
 }
@@ -18,10 +18,10 @@ $ProjectRoot = Join-Path $PSScriptRoot ".."
 $FrontendPath = Join-Path $ProjectRoot "vite"
 
 # 确定期望的 APK 文件路径 (基于 build-frontend.ps1 的输出)
-$ApkName = "app-release-v${Script:VERSION}.apk"
+$ApkName = "app-release-v$($config.VERSION).apk" # 使用 $config.VERSION
 $ApkPath = Join-Path $FrontendPath $ApkName
 
-Write-Host "==== 开始上传应用到腾讯云 COS (版本: $($Script:VERSION)) ====" -ForegroundColor Yellow
+Write-Host "==== 开始上传应用到腾讯云 COS (版本: $($config.VERSION)) ====" -ForegroundColor Yellow # 使用 $config.VERSION
 
 # 检查 APK 文件是否存在
 if (-not (Test-Path $ApkPath)) {
@@ -39,15 +39,13 @@ try {
     Push-Location $FrontendPath
     Write-Host "执行 node upload-to-cos.cjs in $(Get-Location)"
     # 确保 Node.js 环境可用，并且 upload-to-cos.cjs 脚本能正确读取环境变量或配置
-    # 注意：原始脚本通过 Set-Item env: 将 .env.cos 内容设置到 *当前 PowerShell 进程* 的环境变量
     # Node.js 脚本可能需要直接读取 .env 文件或依赖父进程传递的环境变量
-    # 为了保持一致性，我们假设 upload-to-cos.cjs 能读取到 config.ps1 设置的 $Script:COS_SECRET_ID 等
     # 或者更健壮的方式是修改 upload-to-cos.cjs 让它接受参数或读取标准 .env 文件
 
-    # 传递环境变量给 Node 进程 (一种方式)
-    $env:COS_SECRET_ID = $Script:COS_SECRET_ID
-    $env:COS_SECRET_KEY = $Script:COS_SECRET_KEY
-    $env:APP_VERSION = $Script:VERSION # 如果 Node 脚本需要版本号
+    # 传递环境变量给 Node 进程 (从哈希表读取)
+    $env:COS_SECRET_ID = $config.COS_SECRET_ID
+    $env:COS_SECRET_KEY = $config.COS_SECRET_KEY
+    $env:APP_VERSION = $config.VERSION # 如果 Node 脚本需要版本号
     $env:APK_PATH = $ApkPath # 如果 Node 脚本需要 APK 路径
 
     node upload-to-cos.cjs
@@ -60,7 +58,7 @@ try {
 }
 catch {
     Write-Host "错误：上传APK和版本信息到腾讯云COS失败 - $_" -ForegroundColor Red
-    Write-Host "请检查网络连接、COS配置 ($Script:ENV_PATH) 以及 Node.js 脚本 (upload-to-cos.cjs) 是否正确。" -ForegroundColor Red
+    Write-Host "请检查网络连接、COS配置 ($($config.ENV_PATH)) 以及 Node.js 脚本 (upload-to-cos.cjs) 是否正确。" -ForegroundColor Red # 使用 $config.ENV_PATH
     if (Get-Location | Where-Object {$_.Path -eq $FrontendPath}) { Pop-Location } # 确保从 vite 目录返回
     Pause
     exit 1

@@ -1,19 +1,19 @@
 # deploy_refactored/build-frontend.ps1
 # 负责 vite 前端项目构建、Capacitor 同步和 Android APK 打包
 
-# 加载配置
-. "$PSScriptRoot/config.ps1"
+# 加载配置并捕获返回的哈希表
+$config = . "$PSScriptRoot/config.ps1"
 
-# 检查必要的配置是否存在
-if (-not $Script:VERSION) { Write-Host "错误：版本号未在 config.ps1 中加载。" -ForegroundColor Red; exit 1 }
-# COS 配置虽然在这里不直接用，但后续 publish 脚本会用，config.ps1 已加载
+# 检查必要的配置是否存在 (从哈希表读取)
+if (-not $config.VERSION) { Write-Host "错误：版本号未在 config.ps1 中加载。" -ForegroundColor Red; exit 1 }
+# COS 配置检查将在 publish-app.ps1 中进行
 
 # 定义项目根目录和前端目录（相对于此脚本）
 $ProjectRoot = Join-Path $PSScriptRoot ".."
 $FrontendPath = Join-Path $ProjectRoot "vite"
 $AndroidPath = Join-Path $FrontendPath "android"
 
-Write-Host "==== 开始前端构建 (版本: $($Script:VERSION)) ====" -ForegroundColor Yellow
+Write-Host "==== 开始前端构建 (版本: $($config.VERSION)) ====" -ForegroundColor Yellow # 使用 $config.VERSION
 Set-Location $FrontendPath
 Write-Host "当前目录: $(Get-Location)"
 
@@ -108,7 +108,7 @@ catch {
 
 # 构建APK
 Write-Host "==== Step 7.5: 正在构建Android APK (release)... ====" -ForegroundColor Cyan
-$OutputApkName = "app-release-v${Script:VERSION}.apk" # 定义输出文件名，包含版本号
+$OutputApkName = "app-release-v$($config.VERSION).apk" # 定义输出文件名，包含版本号 (使用 $config.VERSION)
 $SourceApkPath = "./app/build/outputs/apk/release/app-release.apk" # 相对于 android 目录
 $DestinationApkPath = Join-Path $FrontendPath $OutputApkName # 目标路径在 vite 目录下
 
