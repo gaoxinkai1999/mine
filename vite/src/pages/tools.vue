@@ -14,6 +14,7 @@
 <!--      <ToolGroup title="订单" :items="orderItems" />-->
 <!--      <ToolGroup title="采购" :items="purchaseItems" />-->
       <ToolGroup title="销售数据" :items="salesDataItems" />
+      <ToolGroup title="设置" :items="settingsItems" />
     </div>
 
 <!--    <div class="additional-tools">-->
@@ -23,8 +24,9 @@
 </template>
 
 <script>
-import ToolGroup from './components/ToolGroup.vue'  // 假设我们创建了一个新的组件
+import ToolGroup from './components/ToolGroup.vue'
 import { ROUTE_NAMES } from '@/constants/routeNames';
+// 假设 ToolGroup 组件可以处理 name 属性进行导航
 
 export default {
   name: "MyTools",
@@ -47,6 +49,9 @@ export default {
       salesDataItems: [
         { title: "月销售数据", name: ROUTE_NAMES.STATISTICS_MONTHLY },
         { title: "每日销售数据", name: ROUTE_NAMES.STATISTICS_DAILY }
+      ],
+      settingsItems: [
+        { title: "打印设置", name: ROUTE_NAMES.SETTINGS_PRINT } // 使用路由名称常量导航
       ]
     }
   }

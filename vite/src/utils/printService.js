@@ -513,20 +513,20 @@ function formatSaleProductRow(detail, isPrinting = true) {
     let row = '';
     const productName = detail.product.name;
     const nameLines = handleTextOverflow(productName, 10); // 缩短名称列宽度，留出间距
-    
+
     // 处理第一行
     const name = padRight(nameLines[0], 14); // 增加填充长度，确保有间距
     const num = padRight(String(detail.quantity), 6);
     const price = padRight(String(detail.salePrice), 8);
     const total = padRight(String(detail.totalSalesAmount), 8);
-    
+
     // 根据模式决定是否使用formatText
     if (isPrinting) {
         row += formatText(`${name}${num}${price}${total}\n`, { size: 0 });
     } else {
         row += `${name}${num}${price}${total}\n`;
     }
-    
+
     // 处理溢出的文本行
     for (let i = 1; i < nameLines.length; i++) {
         const overflowText = `${padRight(nameLines[i], 14)}${padRight("", 6)}${padRight("", 8)}${padRight("", 8)}\n`;
@@ -536,7 +536,21 @@ function formatSaleProductRow(detail, isPrinting = true) {
             row += overflowText;
         }
     }
-    
+
+    // --- 添加条码打印逻辑 ---
+    // 从 localStorage 读取打印条码设置，默认为 false
+    const shouldPrintBarcode = localStorage.getItem('printBarcodeEnabled') === 'true' || false;
+    const barcode = detail.product?.barcode; // 使用可选链安全访问
+
+    if (isPrinting && shouldPrintBarcode && barcode && barcode.length === 13) {
+        const barcodeData = barcode.substring(0, 12); // 提取前12位
+        // 添加带标签和缩进的条码行
+        // 注意：formatBarcode 函数内部写的是 GS k 2 (EAN13)，所以这里传入12位数据是正确的
+        // 增加缩进，保持高度为40
+        row += formatText("    条码:", { size: 0 }) + '\n' + formatBarcode(barcodeData, { height: 40, width: 2, showHRI: true }) + '\n';
+    }
+    // --- 条码打印逻辑结束 ---
+
     return row;
 }
 
@@ -711,3 +725,42 @@ export async function printMergedOrders(orders, onStatusChange = () => {
         onStatusChange('');
     }
 }
+// 新增函数：格式化并生成 CODE128 条形码
+/**
+ * 生成 CODE128 条形码的 ESC/POS 指令
+ * @param {string} data - 要编码的数据
+ * @param {Object} options - 可选参数
+ * @param {number} options.height - 条形码高度 (默认 50)
+ * @param {number} options.width - 条形码宽度 (默认 2)
+ * @param {boolean} options.showHRI - 是否显示人类可读信息 (默认 true)
+ * @returns {string} 格式化后的 ESC/POS 指令字符串
+ */
+function formatBarcode(data, options = {}) {
+    const defaultOptions = {
+        height: 50,  // 默认高度
+        width: 2,    // 默认宽度
+        showHRI: true  // 默认显示 HRI
+    };
+    const opts = { ...defaultOptions, ...options };
+
+    // 设置条形码高度
+    let commands = String.fromCharCode(0x1D, 0x68, opts.height);  // GS h n
+    // 设置条形码宽度
+    commands += String.fromCharCode(0x1D, 0x77, opts.width);     // GS w n
+    // 设置 HRI 位置 (下方)
+    if (opts.showHRI) {
+        commands += String.fromCharCode(0x1D, 0x48, 2);  // GS H 2 (HRI 在下方)
+    } else {
+        commands += String.fromCharCode(0x1D, 0x48, 0);  // GS H 0 (不显示 HRI)
+    }
+    // 打印 CODE128 条形码
+    commands += String.fromCharCode(0x1D, 0x6B, 2);  // GS k 2 (EAN13)
+    // 对于 EAN13，通常不需要显式发送数据长度
+    commands += data;                                 // 数据 (应为12位数字)
+    commands += String.fromCharCode(0x00);            // NUL 结束
+
+    return commands;
+}
+
+// 示例：你可以修改 printOrder 函数来使用这个新函数，例如在格式化内容后添加条形码
+// 如：const printContent = formatReceipt(order, true) + formatBarcode('ORDER12345');

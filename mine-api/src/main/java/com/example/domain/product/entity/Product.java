@@ -49,4 +49,8 @@ public class Product {
 
     @Column(name = "is_batch_managed", nullable = false)
     private boolean batchManaged = false;
+
+    @ToString.Include
+    @Column(name = "barcode", length = 50) // 对应 MySQL VARCHAR(50)
+    private String barcode;
 }

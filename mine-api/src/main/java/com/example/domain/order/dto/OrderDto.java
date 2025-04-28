@@ -73,6 +73,7 @@ public class OrderDto implements Serializable {
         public static class ProductDto implements Serializable {
             private int id;
             private String name;
+private String barcode; // 商品条码
             private int sort;
         }
     }

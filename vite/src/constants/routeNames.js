@@ -44,5 +44,8 @@ export const ROUTE_NAMES = {
   STATISTICS_SHOP: 'statistics-shop',
   
   // 其他
-  DEMO: 'demo'
-} 
+  DEMO: 'demo',
+
+  // 设置模块
+  SETTINGS_PRINT: 'print-settings' // 对应 src/pages/PrintSettings.vue
+}
