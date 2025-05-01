@@ -62,7 +62,6 @@ export default {
 .my-tools {
   padding: 16px;
   background-color: #f5f7fa;
-  height: 100%;
   width: 100%;
   box-sizing: border-box;
   position: relative;
