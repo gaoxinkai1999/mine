@@ -17,7 +17,7 @@ import com.example.query.InventoryQuery;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -106,7 +106,7 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
         }
     }
 
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional
     public void update(InventoryUpdateDto inventoryUpdateDto) {
         log.info("更新库存: {}", inventoryUpdateDto);
         Inventory inventory = findOne(InventoryQuery.builder()
@@ -124,7 +124,7 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
      * @param batch    批次对象
      * @param quantity 入库数量
      */
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional
     public void stockIn(Product product, Batch batch, Integer quantity) {
         // 2. 查找或创建库存记录
         Inventory inventory = findOrCreateInventory(product, batch);
@@ -143,7 +143,7 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
      * @param product  商品对象
      * @param quantity 入库数量
      */
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional
     public void stockIn(Product product, Integer quantity) {
         // 2. 查找或创建库存记录
         Inventory inventory = findOrCreateInventory(product, null);
@@ -163,7 +163,7 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
      * @param batch    批次对象
      * @param quantity 出库数量
      */
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional
     public void stockOut(Product product, Batch batch, Integer quantity) {
         // 2. 查找并检查库存
         Inventory inventory = findInventoryOrThrow(product, batch);
@@ -185,7 +185,7 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
      * @param product  商品对象
      * @param quantity 出库数量
      */
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional
     public void stockOut(Product product, Integer quantity) {
         // 2. 查找并检查库存
         Inventory inventory = findInventoryOrThrow(product, null);
@@ -337,7 +337,7 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
     /**
      * 删除库存记录
       */
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional
     public void delete(Integer id) {
         inventoryRepository.deleteById(id);
     }
