@@ -52,6 +52,7 @@
     <!-- 购物车弹出层 -->
     <CartPopup
       :show="showCart"
+      @update:show="showCart = $event"
     />
   </div>
 </template>

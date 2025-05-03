@@ -1,7 +1,0 @@
-{
-  "changelog": "\n\n新增了打印条码的前后端支持",
-  "version": "1.3.6",
-  "url": "http://update.abocidee.com/updates/dist.zip",
-  "forceDownloadApk": true,
-  "apkUrl": "https://cdn.abocidee.com/app-release.apk"
-}

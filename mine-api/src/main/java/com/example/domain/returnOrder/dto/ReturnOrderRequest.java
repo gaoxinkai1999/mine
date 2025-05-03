@@ -58,5 +58,9 @@ public class ReturnOrderRequest {
          * 退货数量 (当退货类型为"退货退款"时必须大于0)
          */
         private Integer quantity;
+        /**
+         * 批次ID (批次管理商品必填)
+         */
+        private Integer batchId;
     }
 }

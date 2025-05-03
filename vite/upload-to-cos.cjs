@@ -1,91 +1,132 @@
 const COS = require('cos-nodejs-sdk-v5');
 const path = require('path');
-
-// ========== 配置区域 ==========
-// 替换为你的腾讯云密钥
 const fs = require('fs');
-const envPath = require('path').resolve(__dirname, '.env.cos');
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf-8');
-  envContent.split('\n').forEach(line => {
-    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)\s*$/);
-    if (match) {
-      const key = match[1];
-      const value = match[2];
-      process.env[key] = value;
-    }
-  });
-}
+const { promisify } = require('util'); // 用于将回调风格的 API 转换为 Promise
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') }); // 从项目根目录加载 .env 文件
+
+// ========== 配置加载 ==========
+// dotenv 已经将变量加载到 process.env
 
 const SecretId = process.env.COS_SECRET_ID;
 const SecretKey = process.env.COS_SECRET_KEY;
+const Bucket = process.env.COS_BUCKET; // 从 env 读取 Bucket
+const Region = process.env.COS_REGION; // 从 env 读取 Region
 
-// Bucket名称，格式如 'example-1250000000'
-const Bucket = '1-1317280880';
-// 地域，例如 'ap-shanghai'
-const Region = 'ap-beijing';
-
-// 本地APK文件路径
-const apkFilename = process.env.APK_NAME || 'app-release.apk';
-const apkFilePath = path.resolve(__dirname, apkFilename);
-// 本地版本描述文件路径
-const versionFilePath = path.resolve(__dirname, 'version.json');
-
-// ========== 初始化COS客户端 ==========
-const cos = new COS({
-  SecretId,
-  SecretKey,
-});
-
-// ========== 上传函数 ==========
-function uploadFile(filePath, cosKey) {
-  return new Promise((resolve, reject) => {
-    cos.putObject({
-      Bucket,
-      Region,
-      Key: cosKey,
-      Body: fs.createReadStream(filePath),
-      ContentLength: fs.statSync(filePath).size,
-    }, (err, data) => {
-      if (err) {
-        console.error(`上传 ${cosKey} 失败:`, err);
-        reject(err);
-      } else {
-        console.log(`上传成功: https://${Bucket}.cos.${Region}.myqcloud.com/${cosKey}`);
-        resolve(data);
-      }
-    });
-  });
+if (!SecretId || !SecretKey || !Bucket || !Region) {
+  console.error('错误：缺少 COS 配置信息 (COS_SECRET_ID, COS_SECRET_KEY, COS_BUCKET, COS_REGION)。请检查项目根目录的 .env 文件。');
+  process.exit(1);
 }
 
-// ========== 执行上传 ==========
+// ========== 初始化COS客户端 ==========
+const cos = new COS({ SecretId, SecretKey });
+const putObjectPromise = promisify(cos.putObject).bind(cos);
+// cos.sliceUploadFile 可能对大文件更好，但 putObject 更简单
+// const sliceUploadFilePromise = promisify(cos.sliceUploadFile).bind(cos); 
+
+// ========== 辅助函数 ==========
+
+/**
+ * 上传单个文件到 COS
+ * @param {string} localPath 本地文件完整路径
+ * @param {string} cosKey COS 上的目标 Key (路径+文件名)
+ * @param {string} [contentType] 可选的内容类型
+ */
+async function uploadSingleFile(localPath, cosKey, contentType) {
+  if (!fs.existsSync(localPath)) {
+    throw new Error(`本地文件未找到: ${localPath}`);
+  }
+  console.log(`  上传文件: ${localPath} -> ${cosKey}`);
+  const params = {
+    Bucket,
+    Region,
+    Key: cosKey,
+    Body: fs.createReadStream(localPath),
+    ContentLength: fs.statSync(localPath).size,
+  };
+  if (contentType) {
+    params.ContentType = contentType;
+  }
+  try {
+    const data = await putObjectPromise(params);
+    console.log(`  上传成功: ${data.Location}`); // data.Location 包含完整 URL
+    return data;
+  } catch (err) {
+    console.error(`  上传 ${cosKey} 失败:`, err);
+    throw err; // 重新抛出错误以便上层捕获
+  }
+}
+
+/**
+ * 递归上传目录内容到 COS
+ * @param {string} localDirPath 本地目录路径
+ * @param {string} cosPrefix COS 上的目标前缀 (例如 '/')
+ */
+async function uploadDirectory(localDirPath, cosPrefix = '/') {
+  if (!fs.existsSync(localDirPath) || !fs.statSync(localDirPath).isDirectory()) {
+    throw new Error(`本地目录无效或未找到: ${localDirPath}`);
+  }
+  console.log(`上传目录: ${localDirPath} -> ${cosPrefix}`);
+  
+  const files = fs.readdirSync(localDirPath);
+  for (const file of files) {
+    const localFilePath = path.join(localDirPath, file);
+    const stats = fs.statSync(localFilePath);
+    // 确保 cosKey 使用 / 作为分隔符，并移除可能的前导 / (如果 prefix 是 /)
+    const cosKey = (cosPrefix.endsWith('/') ? cosPrefix : cosPrefix + '/') + file; 
+    const cleanCosKey = cosKey.startsWith('/') ? cosKey.substring(1) : cosKey; 
+
+    if (stats.isDirectory()) {
+      // 递归上传子目录
+      await uploadDirectory(localFilePath, cleanCosKey + '/'); 
+    } else if (stats.isFile()) {
+      // 上传文件 (可以根据文件扩展名猜测 ContentType，但简单起见这里省略)
+      await uploadSingleFile(localFilePath, cleanCosKey);
+    }
+  }
+  console.log(`目录 ${localDirPath} 上传完成。`);
+}
+
+// ========== 主逻辑 ==========
 async function main() {
-  // 解析命令行参数，确定要上传的文件
+  // 解析命令行参数 (更健壮的方式)
   const args = process.argv.slice(2);
-  const uploadTarget = args.includes('--file') ? args[args.indexOf('--file') + 1] : 'all'; // 'apk', 'version', or 'all'
+  const typeIndex = args.indexOf('--type');
+  const sourceIndex = args.indexOf('--source');
+  const targetIndex = args.indexOf('--target');
+
+  if (typeIndex === -1 || sourceIndex === -1 || targetIndex === -1 || 
+      args.length <= typeIndex + 1 || args.length <= sourceIndex + 1 || args.length <= targetIndex + 1) {
+    console.error('用法: node upload-to-cos.cjs --type <web|apk|version> --source <local_path> --target <cos_key_or_prefix>');
+    process.exit(1);
+  }
+
+  const uploadType = args[typeIndex + 1];
+  const sourcePath = path.resolve(__dirname, '..', args[sourceIndex + 1]); // source 相对于项目根目录
+  const targetPath = args[targetIndex + 1]; // target 是 COS 上的路径
+
+  console.log(`\n开始上传任务: 类型=${uploadType}, 源=${sourcePath}, 目标=${targetPath}`);
 
   try {
-    let uploaded = false;
-    if (uploadTarget === 'apk' || uploadTarget === 'all') {
-      console.log(`准备上传 APK: ${apkFilename}...`);
-      await uploadFile(apkFilePath, apkFilename);
-      console.log(`APK (${apkFilename}) 上传成功。`);
-      uploaded = true;
+    switch (uploadType) {
+      case 'web':
+        await uploadDirectory(sourcePath, targetPath);
+        break;
+      case 'apk':
+        // targetPath 应该是完整的 COS Key (路径+文件名)
+        await uploadSingleFile(sourcePath, targetPath.startsWith('/') ? targetPath.substring(1) : targetPath);
+        break;
+      case 'version':
+        // targetPath 应该是完整的 COS Key (路径+文件名)
+        await uploadSingleFile(sourcePath, targetPath.startsWith('/') ? targetPath.substring(1) : targetPath, 'application/json');
+        break;
+      default:
+        console.error(`错误：未知的上传类型 "${uploadType}"。支持的类型: web, apk, version`);
+        process.exit(1);
     }
-    if (uploadTarget === 'version' || uploadTarget === 'all') {
-      console.log(`准备上传 version.json...`);
-      await uploadFile(versionFilePath, 'version.json');
-      console.log(`version.json 上传成功。`);
-      uploaded = true;
-    }
-    if (uploaded) {
-       console.log('指定文件上传完成');
-    } else {
-       console.log(`未指定有效上传目标 ('apk', 'version', 'all') 或未找到文件。`);
-    }
+    console.log(`上传任务 (${uploadType}) 成功完成。\n`);
   } catch (error) {
-    console.error('上传过程中出错:', error);
-    process.exit(1); // Ensure workflow fails on error
+    console.error(`上传任务 (${uploadType}) 失败:`, error);
+    process.exit(1); // 确保脚本失败时返回非零退出码
   }
 }
 

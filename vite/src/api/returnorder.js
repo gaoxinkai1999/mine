@@ -75,6 +75,22 @@ const api = {
       url: `/returnOrder/${id}`,
       method: 'GET'
     })
+  },
+
+  /**
+   * @description 获取商品可退批次列表
+   * @url /returnOrder/batches
+   * @method GET
+   * @param {Object} params Query parameters
+   * @param {number} params.productId 
+   * @returns {Promise<any>}
+   */
+  getReturnableBatches(params = {}) {
+    return request({
+      url: '/returnOrder/batches',
+      method: 'GET',
+      params
+    })
   }
 }
 

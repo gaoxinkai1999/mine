@@ -161,7 +161,7 @@ public class OrderService implements BaseRepository<Order, OrderQuery> {
 
         // 先保存一次 Order 以获取 ID 并纳入持久化上下文
         // 注意：如果 Order 有复杂的生成策略或需要先计算总价，可能需要调整
-        orderRepository.save(order);
+        orderRepository.save(order); // 先保存 Order 以获取 ID 并纳入持久化上下文
 
         // 处理订单项
         for (OrderCreateRequest.OrderItemRequest itemRequest : request.getItems()) {

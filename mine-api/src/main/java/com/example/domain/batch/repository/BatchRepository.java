@@ -45,4 +45,14 @@ public interface BatchRepository extends JpaRepository<Batch, Integer> {
      */
     @Query("SELECT COUNT(b) FROM Batch b WHERE b.batchNumber LIKE CONCAT(:prefix, '%')")
     int countByBatchNumberPrefix(@Param("prefix") String prefix);
+
+    /**
+     * 根据商品ID查询库存中存在的批次列表 (仅查询批次信息)
+     * @param productId 商品ID
+     * @return 批次列表
+     */
+    // 注意：这个 JPQL 查询假设 Inventory 实体与 Batch 有关联，并且 quantity > 0
+    // 如果 Inventory 和 Batch 没有直接关联，需要修改查询逻辑，可能需要连接 Inventory 表
+    @Query("SELECT DISTINCT b FROM Batch b JOIN Inventory i ON b.id = i.batch.id WHERE i.product.id = :productId AND i.quantity > 0")
+    List<Batch> findBatchesInStockByProductId(@Param("productId") Integer productId);
 }

@@ -266,6 +266,10 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
      * @return 库存记录
      */
     public Inventory findOrCreateInventory(Product product, Batch batch) {
+        // 对于批次管理的商品，不允许使用无批次接口创建或查询库存
+        if (batch == null && product.isBatchManaged()) {
+            throw new MyException("批次管理商品必须指定批次才能操作库存");
+        }
         Optional<Inventory> inventoryOpt = batch != null ? inventoryRepository.findByProductIdAndBatchId(product.getId(), batch.getId()) : inventoryRepository.findByProductIdAndBatchIdIsNull(product.getId());
 
         if (inventoryOpt.isPresent()) {
@@ -308,6 +312,7 @@ public class InventoryService implements BaseRepository<Inventory, InventoryQuer
             .leftJoin(qInventory.batch, qBatch).fetchJoin()
             .where(
                 qInventory.product.eq(product),
+                qInventory.batch.isNotNull(),
                 qInventory.quantity.gt(0)
             )
             .orderBy(qBatch.productionDate.asc())

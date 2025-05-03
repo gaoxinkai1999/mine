@@ -1,5 +1,16 @@
 package com.example.domain.returnOrder.controller;
 
+import com.example.domain.batch.dto.BatchDto; // 导入 DTO
+import com.example.domain.batch.entity.Batch;
+import com.example.domain.batch.mapper.BatchMapper; // 导入 Mapper
+import com.example.domain.batch.service.BatchService;
+import com.example.query.BatchQuery;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+import java.util.stream.Collectors; // 导入 Collectors
+
 import com.example.domain.order.dto.PageResponse;
 import com.example.domain.returnOrder.dto.ReturnOrderDto;
 import com.example.domain.returnOrder.dto.ReturnOrderListRequest;
@@ -38,6 +49,11 @@ public class ReturnOrderController {
     
     @Autowired
     private ReturnOrderMapper returnOrderMapper;
+
+    @Autowired
+    private BatchService batchService; // 注入 BatchService
+    @Autowired
+    private BatchMapper batchMapper; // 注入 BatchMapper
 
     /**
      * 创建退货订单
@@ -126,5 +142,20 @@ public class ReturnOrderController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return returnOrderService.getReturnOrders(shopId, startDate, endDate);
+    }
+
+    /**
+     * 获取商品可退批次列表
+     * @param productId 商品ID
+     * @return 该商品当前库存中存在的批次列表
+     */
+    @GetMapping("/batches")
+    @Operation(summary = "获取商品可退批次列表", description = "根据商品ID查询当前库存中可供退货选择的批次")
+    public List<BatchDto> getReturnableBatches(@RequestParam Integer productId) { // 返回 DTO 列表
+        List<Batch> batches = batchService.findBatchesInStockByProductId(productId);
+        // 使用 Mapper 将实体列表转换为 DTO 列表
+        return batches.stream()
+                      .map(batchMapper::toDto)
+                      .collect(Collectors.toList());
     }
 }

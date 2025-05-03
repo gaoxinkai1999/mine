@@ -4,6 +4,9 @@ package com.example.domain.returnOrder.service;
 import com.example.domain.inventory.dto.OperationType; // 添加 OperationType 导入
 import com.example.domain.inventory.service.InventoryService;
 import com.example.domain.inventory.service.InventoryTransactionService; // 添加 InventoryTransactionService 导入
+import com.example.domain.batch.service.BatchService;
+import com.example.query.BatchQuery;
+import com.example.domain.batch.entity.Batch;
 import com.example.domain.product.entity.Product;
 import com.example.domain.product.service.ProductService;
 import com.example.domain.returnOrder.dto.ReturnOrderDto;
@@ -67,6 +70,8 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
 
     @Autowired
     private InventoryTransactionService inventoryTransactionService; // 注入库存交易服务
+    @Autowired
+    private BatchService batchService; // 注入批次服务
 
     /**
      * 构建基本条件查询
@@ -189,11 +194,21 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
             
             // 处理库存
             if (detailRequest.getType() == com.example.domain.returnOrder.entity.ReturnType.退货退款) {
-               // 退货入库，使用实际的退货数量
-               inventoryService.stockIn(product, detailRequest.getQuantity());
-               // 记录库存流水 (退货入库)
-               // 注意：退货通常不关联批次，除非业务特别要求追踪退回的具体批次
-               inventoryTransactionService.recordTransactionForReturn(product, null, detailRequest.getQuantity(), OperationType.退货入库, savedReturnOrder);
+                // 退货入库
+                if (product.isBatchManaged()) {
+                    Integer batchId = detailRequest.getBatchId();
+                    if (batchId == null) {
+                        throw new MyException("批次管理商品必须指定批次ID");
+                    }
+                    Batch batch = batchService.findOne(BatchQuery.builder().id(batchId).build())
+                                             .orElseThrow(() -> new MyException("批次不存在: " + batchId));
+                    inventoryService.stockIn(product, batch, detailRequest.getQuantity());
+                    inventoryTransactionService.recordTransactionForReturn(product, batch, detailRequest.getQuantity(), OperationType.退货入库, savedReturnOrder);
+                } else {
+                    // 非批次管理商品
+                    inventoryService.stockIn(product, detailRequest.getQuantity());
+                    inventoryTransactionService.recordTransactionForReturn(product, null, detailRequest.getQuantity(), OperationType.退货入库, savedReturnOrder);
+                }
             }
         }
         

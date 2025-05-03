@@ -134,7 +134,8 @@ export const useReturnOrderStore = defineStore('returnOrder', () => {
             const products = await api.product.getProducts()
             foods.value = products.map(food => ({
                 ...food,
-                count: 0
+                count: 0,
+                isBatchManaged: food.batchManaged
             }))
         } catch (error) {
             console.error('获取商品失败:', error)
@@ -198,15 +199,21 @@ export const useReturnOrderStore = defineStore('returnOrder', () => {
             cart.value.push({
                 id: item.id,
                 name: item.name,
-                price: item.price,
-                count: item.count,
+                price: item.price, // 注意：这里可能应该是 item.amount? 确认一下 ProductList 传的是 price 还是 amount
+                amount: item.amount, // <--- 添加退货金额
+                type: item.type,     // <--- 添加退货类型
+                count: item.count,   // count 在退货场景似乎不需要? 确认一下
+                quantity: item.quantity, // <--- 添加退货数量
+                isBatchManaged: item.isBatchManaged,
+                batchId: null,
             })
         }
 
-        const foodItem = foods.value.find(i => i.id === item.id)
-        if (foodItem) {
-            foodItem.count = item.count
-        }
+        // 更新 foods 列表中的 count 似乎在退货场景不需要，注释掉或移除
+        // const foodItem = foods.value.find(i => i.id === item.id)
+        // if (foodItem) {
+        //     foodItem.count = item.count
+        // }
     }
 
     /**
@@ -245,7 +252,8 @@ export const useReturnOrderStore = defineStore('returnOrder', () => {
                     productId: item.id,
                     amount: Number(item.amount),
                     type: item.type, // 退货类型已经是字符串，后端会自动转成枚举
-                    quantity: item.type === '退货退款' ? Number(item.quantity) : null // 退货数量，仅退款类型为null
+                    quantity: item.type === '退货退款' ? Number(item.quantity) : null, // 退货数量，仅退款类型为null
+                    batchId: item.batchId || null // 批次ID
                 })),
             }
 

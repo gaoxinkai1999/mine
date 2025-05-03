@@ -10,7 +10,8 @@
     "build:dev": "vite build --mode development",
     "build:prod": "vite build --mode production",
     "preview": "vite preview",
-    "preview:prod": "vite preview --mode production"
+    "preview:prod": "vite preview --mode production",
+    "update-version": "node ../update-versions.js"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
@@ -39,6 +40,7 @@
     "@vant/auto-import-resolver": "^1.2.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "archiver": "^7.0.1",
+    "dotenv": "^16.5.0",
     "fs-extra": "^11.3.0",
     "sass-embedded": "^1.85.0",
     "unplugin-auto-import": "^19.1.0",

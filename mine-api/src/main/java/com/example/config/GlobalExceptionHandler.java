@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException; // 导入超时异常类
 
 import java.util.List;
 
@@ -57,6 +58,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleException(Exception e) {
+        // 检查是否是 SSE 请求超时异常
+        if (e instanceof AsyncRequestTimeoutException) {
+            log.warn("忽略 SSE 请求超时异常: {}", e.getMessage());
+            // 对于 SSE 超时，不返回自定义错误体，让 SseEmitter 内部处理完成或错误回调
+            return null; 
+        }
+        
+        // 处理其他所有未知异常
         log.error("系统异常: ", e);
         return new ErrorResponse("系统异常,请稍后重试");
     }

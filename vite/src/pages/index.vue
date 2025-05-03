@@ -9,7 +9,7 @@
     <!-- 顶部区域 -->
     <header class="header">
       <div class="header-content">
-        <h1 class="title">门店配送系统</h1>
+        <h1 class="title">门店配送系统aaa</h1>
         <div class="version-info">
           <h3 class="version">v{{ version }}</h3>
           <span class="changelog" v-if="changelog">更新日志:{{ changelog }}</span>
@@ -49,19 +49,18 @@
   </div>
 </template>
 
-<script>
+<script setup> // 改为 <script setup> 以方便直接使用常量
 import { ref, onMounted } from 'vue';
-import APP_VERSION from '@/../version.json'
+// 不再需要导入旧的 version.json
+// import APP_VERSION from '@/../version.json' 
 import { ROUTE_NAMES } from '@/constants/routeNames';
 
-export default {
-  name: 'HomePage',
-  setup() {
+// 直接从全局常量获取版本和日志
+// 添加类型检查以防常量未定义
+const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '未知';
+const changelog = typeof __APP_RELEASE_NOTES__ !== 'undefined' ? __APP_RELEASE_NOTES__ : '';
 
-    const {version,changelog} = APP_VERSION;
-
-    
-    // 功能菜单项
+// 功能菜单项
     const menuItems = ref([
       { text: '采购历史', icon: 'cart-o', name: ROUTE_NAMES.PURCHASE_LIST },
       { text: '库存管理', icon: 'label-o', name: ROUTE_NAMES.PRODUCT_INVENTORY },
@@ -73,13 +72,7 @@ export default {
       console.log('当前版本日志：', changelog)
     });
     
-    return {
-      version,
-      changelog,
-      menuItems
-    };
-  }
-};
+    // <script setup> 会自动暴露顶层变量给模板，无需 return
 </script>
 
 <style scoped>

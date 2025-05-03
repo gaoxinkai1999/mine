@@ -1,20 +1,24 @@
 <template>
-  <div class="shop-info">
+  <!-- 添加 v-bind="$attrs" -->
+  <div class="shop-info" v-bind="$attrs">
     <div class="shop-info__content" @click="showPicker=!showPicker">
       <div class="shop-info__header">
-        <h2 class="shop-name">{{ currentShop?.name || '加载中...' }}</h2>
+        <!-- 使用 props.shop -->
+        <h2 class="shop-name">{{ props.shop?.name || '加载中...' }}</h2>
         <van-icon name="arrow"/>
       </div>
 
       <div class="shop-info__details">
         <div class="info-item">
-          <span>{{ currentShop?.address || '' }}</span>
+          <!-- 使用 props.shop -->
+          <span>{{ props.shop?.address || '' }}</span>
         </div>
 
         <div class="info-row">
           <div class="info-item">
             <van-icon name="guide-o"/>
-            <span>距离 {{ Math.round(currentShop?.distance || 0) }}米</span>
+            <!-- 使用 props.shop -->
+            <span>距离 {{ Math.round(props.shop?.distance || 0) }}米</span>
           </div>
           <div class="info-item">
             <van-icon name="clock-o"/>
@@ -46,25 +50,34 @@
 </template>
 
 <script setup>
-import {useReturnOrderStore} from '@/stores/returnOrder.js'
-import {storeToRefs} from 'pinia'
-import {ref, computed} from 'vue'
+import { useReturnOrderStore } from '@/stores/returnOrder.js'
+import { storeToRefs } from 'pinia'
+import { ref } from 'vue' // 移除 computed
 import ShopListItem from '@/components/Shop/ShopListItem.vue'
 import NearShopList from "@/components/Shop/nearShopList.vue";
 
+// 声明 props
+const props = defineProps({
+  shop: {
+    type: Object,
+    required: true
+  }
+})
+
 const store = useReturnOrderStore()
-const {nearbyShops} = storeToRefs(store)
+const { nearbyShops } = storeToRefs(store) // nearbyShops 仍然需要用于选择器
 const showPicker = ref(false)
 const active = ref(0);
 
 const receiveDataFromChild = async (data) => {
   showPicker.value = false
-  // 更新当前选中的商店
+  // 更新当前选中的商店 (这个逻辑保持不变，因为切换商店需要更新整个 store)
   await store.changeShop(data)
 }
-const currentShop = computed(() => {
-  return store.currentShop
-})
+// 移除 computed currentShop，直接使用 props.shop
+// const currentShop = computed(() => {
+//   return store.currentShop
+// })
 
 </script>
 

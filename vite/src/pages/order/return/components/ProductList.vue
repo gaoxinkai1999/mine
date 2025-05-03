@@ -1,5 +1,6 @@
 <template>
-  <div class="product-list">
+  <!-- 将 $attrs 绑定到这个根 div 上 -->
+  <div class="product-list" v-bind="$attrs">
     <van-empty v-if="products.length === 0" description="没有找到商品"/>
     <van-card
         v-for="(item, index) in products"
@@ -55,12 +56,21 @@
 
 <script setup>
 import {ref, computed} from 'vue'
+// 定义组件接收的 props 和发出的 emits
+defineProps({
+  products: {
+    type: Array,
+    required: true
+  }
+})
+defineEmits(['update-cart'])
 // 引入store
 import {useReturnOrderStore} from '@/stores/returnOrder.js'
 import {showFailToast} from "vant";
 
 const store = useReturnOrderStore()
-const products = computed(() => store.currentFoods)
+// 不再需要从 store 获取 products，直接使用 props
+// const products = computed(() => store.currentFoods)
 const cart = computed(() => store.cart)
 const showDialog = ref(false)
 const number = ref(0)
@@ -90,12 +100,15 @@ const handleConfirm = (item) => {
     return
   }
   
-  cart.value.push({
+  // 调用 store 的 updateCart 方法来更新购物车，而不是直接 push
+  store.updateCart({
     id: item.id,
     name: item.name,
     amount: Number(number.value),
     type: checked.value,
-    quantity: checked.value === '退货退款' ? Number(quantity.value) : null
+    quantity: checked.value === '退货退款' ? Number(quantity.value) : null,
+    // 传递 isBatchManaged 属性
+    isBatchManaged: item.isBatchManaged
   })
 }
 </script>

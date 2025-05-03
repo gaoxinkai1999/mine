@@ -40,14 +40,7 @@ const router = useRouter();
 const route = useRoute();
 const myStore = useMyStore();
 
-//测试代码区域
-import { useAppUpdate } from '@/utils/update.js';
-
-const { checkForUpdates } = useAppUpdate();
-
-
-
-checkForUpdates()
+// 移除了冗余的 useAppUpdate 导入和 checkForUpdates 调用
 
 // Tabbar 激活状态
 const activeTab = ref('index');

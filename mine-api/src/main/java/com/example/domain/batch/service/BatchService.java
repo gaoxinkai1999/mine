@@ -167,4 +167,13 @@ public class BatchService implements BaseRepository<Batch, BatchQuery> {
 
         return productionDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
     }
-} 
+
+    /**
+     * 根据商品ID查询库存中存在的批次列表
+     * @param productId 商品ID
+     * @return 批次列表
+     */
+    public List<Batch> findBatchesInStockByProductId(Integer productId) {
+        return batchRepository.findBatchesInStockByProductId(productId);
+    }
+}
