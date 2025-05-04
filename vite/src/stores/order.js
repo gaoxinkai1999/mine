@@ -147,24 +147,91 @@ export const useOrderStore = defineStore('order', () => {
      * 4. 同步更新商品列表中的数量
      */
     function updateCart(item) {
-        const cartItem = cart.value.find(i => i.id === item.id)
+        // 此方法仅处理非批次管理的商品更新
+        if (item.batchManaged) {
+            console.warn('updateCart should not be called for batch managed items. Use updateCartWithBatch instead.');
+            return;
+        }
+
+        const cartItem = cart.value.find(i => i.id === item.id);
         if (item.count === 0) {
-            cart.value = cart.value.filter(i => i.id !== item.id)
+            // 从购物车移除
+            cart.value = cart.value.filter(i => i.id !== item.id);
         } else if (cartItem) {
-            cartItem.count = item.count
+            // 更新购物车中现有商品的数量
+            cartItem.count = item.count;
+            // 如果价格有变动也需要更新，这里假设价格在添加时确定或通过其他机制修改
+            cartItem.price = item.price; // 更新价格以支持修改价格功能
         } else {
-            // 只保存购物车所需的必要属性
+            // 添加新商品到购物车 (非批次管理)
             cart.value.push({
                 id: item.id,
                 name: item.name,
-                price: item.defaultSalePrice,
+                price: item.price, // 使用传入的 price，可能已被修改
                 count: item.count,
-            })
+                batchManaged: false, // 明确非批次管理
+                batchDetails: null, // 非批次管理无批次详情
+                defaultSalePrice: item.defaultSalePrice // 保留原始售价
+            });
         }
 
-        const foodItem = foods.value.find(i => i.id === item.id)
+        // 同步更新 foods 列表中的数量 (无论是否在购物车中)
+        const foodItem = foods.value.find(i => i.id === item.id);
         if (foodItem) {
-            foodItem.count = item.count
+            foodItem.count = item.count;
+            // 如果价格被修改，也同步更新 foods 中的 price
+            foodItem.price = item.price;
+        }
+    }
+
+    /**
+     * 更新购物车中的批次管理商品
+     * @param {Object} payload - 包含商品ID和批次详情 { productId, batchDetails }
+     * batchDetails: [{ batchId, batchNumber, quantity }]
+     */
+    function updateCartWithBatch(payload) {
+        const { productId, batchDetails } = payload;
+        const foodItem = foods.value.find(i => i.id === productId);
+        if (!foodItem) {
+            console.error(`Product with ID ${productId} not found in foods list.`);
+            return;
+        }
+
+        // 计算总数量
+        const totalQuantity = batchDetails.reduce((sum, detail) => sum + detail.quantity, 0);
+
+        // 更新 foods 列表中的总数量
+        foodItem.count = totalQuantity;
+
+        // 更新购物车
+        const cartItemIndex = cart.value.findIndex(i => i.id === productId);
+
+        if (totalQuantity > 0) {
+            const newBatchDetails = batchDetails.filter(detail => detail.quantity > 0); // 只保留数量大于0的批次
+
+            if (cartItemIndex > -1) {
+                // 更新购物车中现有商品
+                cart.value[cartItemIndex].count = totalQuantity;
+                cart.value[cartItemIndex].batchDetails = newBatchDetails;
+                // 批次商品的价格通常在选择批次时不修改，以商品默认售价为准或通过特定修改价格入口
+                // cart.value[cartItemIndex].price = foodItem.price;
+            } else {
+                // 添加新商品到购物车 (批次管理)
+                cart.value.push({
+                    id: foodItem.id,
+                    name: foodItem.name,
+                    price: foodItem.price, // 使用 foods 中的当前价格 (通常是 defaultSalePrice)
+                    count: totalQuantity,
+                    batchManaged: true, // 明确批次管理
+                    batchDetails: newBatchDetails,
+                    defaultSalePrice: foodItem.defaultSalePrice // 保留原始售价
+                });
+            }
+        } else {
+            // 如果总数量为0，从购物车移除
+            if (cartItemIndex > -1) {
+                cart.value.splice(cartItemIndex, 1);
+            }
         }
     }
 
@@ -193,15 +260,31 @@ export const useOrderStore = defineStore('order', () => {
         try {
             const order = {
                 shopId: currentShop.value.id,
-                items: cart.value.map(item => ({
-                    productId: item.id,
-                    quantity: item.count,
-                    price: item.price
-                })),
-            }
+                items: cart.value.map(item => {
+                    const orderItem = {
+                        productId: item.id,
+                        quantity: item.count,
+                        price: item.price // 使用购物车中的当前价格（可能已被修改）
+                    };
+                    // 如果是批次管理的商品且有批次详情，则添加到请求体
+                    if (item.batchManaged && item.batchDetails && item.batchDetails.length > 0) {
+                        // 过滤掉数量为0的批次详情，以防万一
+                        const validBatchDetails = item.batchDetails.filter(bd => bd.quantity > 0);
+                        if (validBatchDetails.length > 0) {
+                           orderItem.batchDetails = validBatchDetails.map(bd => ({
+                                batchId: bd.batchId,
+                                quantity: bd.quantity
+                                // 后端 OrderService.java 确认只需要 batchId 和 quantity
+                            }));
+                        }
+                    }
+                    return orderItem;
+                }),
+            };
 
+            console.log("Submitting order:", JSON.stringify(order, null, 2)); // 增加日志方便调试
 
-            await api.order.createOrder(order)
+            await api.order.createOrder(order);
             showSuccessToast('下单成功')
             clearCart()
             return true
@@ -229,8 +312,9 @@ export const useOrderStore = defineStore('order', () => {
         totalCount,
         // 方法
         init,
-        updateCart,
+        updateCart, // 处理非批次商品
+        updateCartWithBatch, // 处理批次商品
         clearCart,
         submitOrder
     }
-}) 
+})

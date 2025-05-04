@@ -50,6 +50,15 @@
                   <span>¥{{ (item.price * item.count).toFixed(2) }}</span>
                 </div>
               </div>
+              <!-- 新增：显示已选批次详情 -->
+              <div v-if="item.batchManaged && item.batchDetails && item.batchDetails.length > 0" class="batch-details-display">
+                <span class="batch-label">已选批次:</span>
+                <span v-for="bd in item.batchDetails" :key="bd.batchId" class="batch-tag">
+                  {{ bd.batchNumber }}: {{ bd.quantity }}
+                </span>
+                <!-- 可选：添加编辑批次按钮 -->
+                <!-- <van-button size="mini" plain type="warning" @click="editItemBatches(item)" class="edit-batch-btn">编辑</van-button> -->
+              </div>
             </div>
             <div class="cart-item-actions">
               <van-button
@@ -131,20 +140,50 @@ const newPrice = ref('');
 const showPriceDialog = (item) => {
   showPriceEdit.value = true;
   editingItem.value = item;
-  newPrice.value = item.defaultSalePrice;
+  newPrice.value = item.price; // 初始化为当前价格，而非默认价
 };
 const updatePrice = () => {
   if (!editingItem.value) return;
 
   const price = parseFloat(newPrice.value);
-  if (isNaN(price) || price <= 0) {
+  if (isNaN(price) || price < 0) { // 允许价格为0？根据业务调整
+     showToast('请输入有效的价格');
     return;
   }
+  
+  // 可以在这里添加价格校验逻辑，例如不能低于成本价等
+  // if (price < editingItem.value.costPrice) { ... }
 
-  editingItem.value.price = price;
+  // 直接修改 store 中的 cart item price
+  const cartItem = store.cart.find(i => i.id === editingItem.value.id);
+  if (cartItem) {
+      cartItem.price = price;
+      // 如果需要，也同步更新 foods 列表中的价格
+      const foodItem = store.foods.find(f => f.id === editingItem.value.id);
+      if (foodItem) {
+          foodItem.price = price;
+      }
+  }
+
 
   showPriceEdit.value = false;
 };
+
+
+// 可选: 添加编辑批次的方法
+// import BatchSelector from './BatchSelector.vue'; // 需要引入
+// const showBatchEdit = ref(false);
+// const editingBatchItem = ref(null);
+// const editItemBatches = (item) => {
+//   editingBatchItem.value = item;
+//   showBatchEdit.value = true;
+// }
+// const handleBatchEditConfirm = (batchDetails) => {
+//   // ... 类似 ProductList 中的 handleBatchConfirm 逻辑 ...
+//   // 调用 store.updateCartWithBatch
+//   showBatchEdit.value = false;
+// }
+
 
 // 处理提交订单 (New function)
 const handleSubmitOrder = () => {
@@ -301,6 +340,40 @@ const handleSubmitOrder = () => {
   border-color: #ff6b00 !important;
   background-color: rgba(255, 107, 0, 0.05);
 }
+
+
+/* 新增批次详情显示样式 */
+.batch-details-display {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #646566;
+  display: flex;
+  flex-wrap: wrap; /* 允许换行 */
+  align-items: center;
+  gap: 4px; /* 标签之间的间距 */
+}
+
+.batch-label {
+  font-weight: 500;
+  margin-right: 4px;
+  flex-shrink: 0; /* 防止标签被压缩 */
+}
+
+.batch-tag {
+  background-color: #ecf5ff; /* 淡蓝色背景 */
+  color: #409eff; /* 蓝色文字 */
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap; /* 防止批次信息内部换行 */
+}
+
+.edit-batch-btn {
+  margin-left: 8px; /* 与批次标签保持距离 */
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
 
 /* 空购物车样式 */
 :deep(.van-empty) {

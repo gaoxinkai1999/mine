@@ -31,12 +31,38 @@ spring:
 
     type: com.alibaba.druid.pool.DruidDataSource
     druid:
-      # 连接池初始化大小
+      # --- 你现有的配置 ---
       initial-size: 10
-      # 最大活动连接数
-      max-active: 200
-      # 最小空闲连接数
+      max-active: 50 # 考虑是否需要这么高，可以先调低如 50 或 100
       min-idle: 10
+
+      # --- 以下是解决问题的关键配置 ---
+
+      # 1. 配置获取连接时是否检查有效性 (非常重要!)
+      test-on-borrow: true
+      # 2. 配置归还连接时是否检查有效性 (通常设为 false 提高性能)
+      test-on-return: false
+      # 3. 配置空闲时是否检查有效性 (配合下面的驱逐策略)
+      test-while-idle: true
+
+      # 4. 用于检查连接有效性的 SQL 查询 (对大多数数据库 SELECT 1 是最高效的)
+      validation-query: SELECT 1
+      #    对于某些数据库可能需要不同的查询，如 Oracle 用 SELECT 1 FROM DUAL
+
+      # 5. 连接在池中最小生存时间 (单位毫秒)，达到此时间后空闲会被关闭
+      #    设置一个比数据库 wait_timeout 稍小的值，例如数据库是8小时(28800秒)，这里可设7小时
+      # min-evictable-idle-time-millis: 25200000 # 7 hours example
+      #    或者设置一个更短的时间，比如 30 分钟，强制连接定期更新
+      min-evictable-idle-time-millis: 1800000 # 30 minutes
+
+      # 6. 检测需要关闭的空闲连接的时间间隔 (单位毫秒)
+      time-between-eviction-runs-millis: 60000 # 1 minute
+
+      # 7. (可选，但推荐) Druid 的 keepAlive 功能，尝试主动维持连接活跃
+      #    它会使用 validationQuery 定期 ping 数据库，防止连接因空闲被服务器或防火墙断开
+      keep-alive: true
+      #    keepAlive 的检测间隔默认等于 time-between-eviction-runs-millis * 2 / 3
+      #    也可以单独设置 keep-alive-between-time-millis
 
 
 
