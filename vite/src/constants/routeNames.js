@@ -31,6 +31,7 @@ export const ROUTE_NAMES = {
   PRODUCT_DETAIL: 'product-detail',
   PRODUCT_INVENTORY: 'product-inventory',
   PRODUCT_ORDER_LIST: 'product-order-list',
+  MONITOR_EXPIRY : 'expiry-monitor', // 监控过期
   
   // 采购模块
   PURCHASE_LIST: 'purchase-list',

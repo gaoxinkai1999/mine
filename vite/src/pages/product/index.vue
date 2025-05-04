@@ -150,6 +150,14 @@
             </van-radio-group>
           </template>
         </van-field>
+        <!-- 新增：临期监控阈值 -->
+        <van-field
+          v-if="newItem.batchManaged"
+          v-model.number="newItem.expiryMonitoringThresholdDays"
+          label="临期阈值(天)"
+          placeholder="请输入天数 (可选)"
+          type="number"
+        />
         <van-field v-model="newItem.category.name" clickable label="品类" placeholder="请选择品类" readonly required
           @click="showPicker = true" />
         <van-popup v-model:show="showPicker" position="bottom">
@@ -246,6 +254,7 @@ export default {
         category: { id: null, name: "" },
         batchManaged: false,
         costPrice: 0,
+        expiryMonitoringThresholdDays: null, // 新增：临期监控阈值
       };
     },
     onPickerConfirm({ selectedOptions }) {
@@ -327,6 +336,7 @@ export default {
         category: { id: item.categoryId, name: this.categories.find(c => c.id === item.categoryId).name },
         batchManaged: item.batchManaged,
         costPrice: item.costPrice,
+        expiryMonitoringThresholdDays: item.expiryMonitoringThresholdDays, // 新增：编辑时加载阈值
       };
       this.isEdit = true;
       this.showAddPopup = true;

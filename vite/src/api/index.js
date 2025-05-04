@@ -9,6 +9,7 @@ import inventory from './inventory'
 import inventoryTransaction from './inventoryTransaction'
 import category from './category'
 import batch from './batch'
+import monitoring from './monitoring'
 
 export default {
   statistics,
@@ -21,5 +22,6 @@ export default {
   inventory,
   inventoryTransaction,
   category,
-  batch
+  batch,
+  monitoring
 }

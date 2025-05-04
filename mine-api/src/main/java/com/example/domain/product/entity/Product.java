@@ -53,4 +53,8 @@ public class Product {
     @ToString.Include
     @Column(name = "barcode", length = 50) // 对应 MySQL VARCHAR(50)
     private String barcode;
+
+    @ToString.Include
+    @Column(name = "expiry_monitoring_threshold_days")
+    private Integer expiryMonitoringThresholdDays; // 商品临期监控阈值（天），使用Integer以允许null
 }

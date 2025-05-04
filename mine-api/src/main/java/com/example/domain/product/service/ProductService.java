@@ -99,8 +99,10 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
         product.setDefaultSalePrice(productDto.getDefaultSalePrice());
         product.setDel(false);
         product.setSort(productRepository.findMaxSort() + 1);
+        // 新增：设置临期监控阈值
+        product.setExpiryMonitoringThresholdDays(productDto.getExpiryMonitoringThresholdDays());
         product = productRepository.save(product);
-        
+
         // 初始化库存记录
         Inventory inventory = inventoryService.findOrCreateInventory(product, null);
         inventory.setQuantity(0);

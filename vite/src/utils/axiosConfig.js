@@ -8,7 +8,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.102:8085/api'
 // 创建 axios 实例
 const instance = axios.create({
     baseURL: BASE_URL, // 使用环境变量中的 API URL
-    timeout: 5000, // 请求超时时间
+    timeout: 10000, // 请求超时时间
 });
 
 

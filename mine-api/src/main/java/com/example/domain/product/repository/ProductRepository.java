@@ -43,4 +43,9 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
      * @return 是否存在
      */
     boolean existsByName(String name);
+/**
+     * 查询所有设置了临期阈值且需要批次管理的商品
+     * @return 商品列表
+     */
+    List<Product> findByExpiryMonitoringThresholdDaysIsNotNullAndBatchManagedIsTrue();
 }

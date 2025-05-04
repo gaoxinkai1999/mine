@@ -44,6 +44,7 @@ export default {
       productItems: [
         { title: "商品总览", name: ROUTE_NAMES.PRODUCT_LIST },
         { title: "库存管理", name: ROUTE_NAMES.PRODUCT_INVENTORY },
+        { title: "商品临期监控", name: ROUTE_NAMES.MONITOR_EXPIRY }, // 添加新入口，假设常量已定义
       ],
 
       salesDataItems: [
