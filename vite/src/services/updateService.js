@@ -37,13 +37,11 @@ function promptWebReload(notes = "") {
         cancelButtonText: '稍后提醒',
     }).then(() => {
         // 用户点击确认
-        console.log('用户确认刷新 Web 应用');
         // 注意：简单 reload 可能不足以清除所有缓存，特别是 Service Worker
         // 生产环境可能需要更复杂的缓存清除策略
         window.location.reload(true);
     }).catch(() => {
         // 用户点击取消
-        console.log('用户取消刷新 Web 应用');
     });
 }
 
@@ -73,13 +71,11 @@ async function handleWebUpdateCheck(latestWebVersion, releaseNotes) { // 移除�
         // 如果没有传入 releaseNotes (很可能是 SSE 触发的)，则去获取
         let notesToDisplay = releaseNotes;
         if (!notesToDisplay) {
-            console.log('SSE 触发更新，尝试获取更新日志...');
             try {
                 const response = await fetch(LATEST_VERSIONS_URL);
                 if (response.ok) {
                     const data = await response.json();
                     notesToDisplay = data.webReleaseNotes; // 获取日志
-                    console.log('成功获取到更新日志。');
                 } else {
                      console.warn('获取更新日志失败，状态码:', response.status);
                 }
@@ -91,7 +87,6 @@ async function handleWebUpdateCheck(latestWebVersion, releaseNotes) { // 移除�
         // 不再修改 currentWebVersion 状态变量
         promptWebReload(notesToDisplay); // 传递获取到的或传入的更新日志
     } else if (latestWebVersion && latestWebVersion === BUILT_APP_VERSION) {
-        console.log('Web 版本已是最新。');
     } else if (!latestWebVersion) {
         console.warn('用于检查的最新 Web 版本无效。');
     }
@@ -105,7 +100,6 @@ async function handleWebUpdateCheck(latestWebVersion, releaseNotes) { // 移除�
  */
 async function handleNativeUpdateCheck(latestNativeVersion, apkUrl, releaseNotes = "") {
     if (!latestNativeVersion || !apkUrl) {
-        console.log('未获取到有效的 Native 版本信息或 APK URL。');
         return;
     }
 
@@ -131,14 +125,12 @@ async function handleNativeUpdateCheck(latestNativeVersion, apkUrl, releaseNotes
                  cancelButtonText: '稍后提醒',
              }).then(async () => {
                  // 用户点击确认
-                 console.log('用户确认下载 Native 更新');
                  // 确保 apkUrl 包含时间戳以防止缓存 (如果后端没加)
                  const finalApkUrl = apkUrl.includes('?') ? `${apkUrl}&t=${Date.now()}` : `${apkUrl}?t=${Date.now()}`;
                  // 注意：downloadAndInstallApk 内部应该有 loading 提示
                  await downloadAndInstallApk(finalApkUrl); 
              }).catch(() => {
                   // 用户点击取消
-                 console.log('用户取消下载 Native 更新');
              });
         } else {
             console.log('Native 版本已是最新。');
@@ -156,11 +148,9 @@ async function handleNativeUpdateCheck(latestNativeVersion, apkUrl, releaseNotes
  */
 function startSSE() {
     if (!isAppActive) {
-        console.log('应用非活动状态，跳过启动 SSE。');
         return;
     }
     if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
-        console.log('SSE 连接已打开或正在连接中。');
         return;
     }
 
@@ -193,7 +183,6 @@ function startSSE() {
             console.log('SSE 断开，尝试重连...');
             setTimeout(startSSE, 5000); // 5 秒后重试
         } else {
-             console.log('SSE 断开，但应用已非活动状态，不重连。');
         }
     };
 }
@@ -215,14 +204,14 @@ function stopSSE() {
  * 执行一次性版本检查 (Web + Native)
  */
 async function checkVersions() {
-    console.log('执行版本检查 (Web + Native)...');
+    // console.log('执行版本检查 (Web + Native)...');
     try {
         const response = await fetch(LATEST_VERSIONS_URL);
         if (!response.ok) {
             throw new Error(`网络响应不正常: ${response.statusText}`);
         }
         const data = await response.json(); // 解析 { webVersion, webReleaseNotes, nativeVersion, nativeReleaseNotes, apkUrl }
-        console.log('从后端获取的版本信息:', data);
+        // console.log('从后端获取的版本信息:', data);
 
         // 处理 Web 版本 (传递日志)
         handleWebUpdateCheck(data.webVersion, data.webReleaseNotes);
@@ -235,7 +224,7 @@ async function checkVersions() {
     } finally {
         // 无论检查结果如何，如果应用是活动的，确保 SSE 连接是启动的
         if (isAppActive && (!eventSource || eventSource.readyState === EventSource.CLOSED)) {
-            console.log('版本检查后，确保 SSE 已启动...');
+            // console.log('版本检查后，确保 SSE 已启动...');
             startSSE();
         }
     }
@@ -249,7 +238,7 @@ async function checkVersions() {
 export function initializeUpdateService() {
     // 监听 Capacitor 应用状态变化
     App.addListener('appStateChange', ({ isActive }) => {
-        console.log(`应用状态改变: ${isActive ? '活动' : '非活动'}`);
+        // console.log(`应用状态改变: ${isActive ? '活动' : '非活动'}`);
         isAppActive = isActive;
         if (isActive) {
             // 在变为活动状态时立即执行检查
@@ -265,15 +254,15 @@ export function initializeUpdateService() {
     App.getState().then(state => {
         isAppActive = state.isActive;
         if (isAppActive) {
-             console.log('应用初始为活动状态。');
+             // console.log('应用初始为活动状态。');
              checkVersions();
              // checkVersions 函数内部会在需要时启动 SSE
         } else {
-            console.log('应用初始为非活动状态。');
+            // console.log('应用初始为非活动状态。');
         }
     });
 
-    console.log('更新服务已初始化。');
+    // console.log('更新服务已初始化。');
 }
 
 // 可选：如果其他地方需要，可以导出函数

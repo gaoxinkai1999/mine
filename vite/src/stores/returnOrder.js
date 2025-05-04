@@ -199,13 +199,12 @@ export const useReturnOrderStore = defineStore('returnOrder', () => {
             cart.value.push({
                 id: item.id,
                 name: item.name,
-                price: item.price, // 注意：这里可能应该是 item.amount? 确认一下 ProductList 传的是 price 还是 amount
                 amount: item.amount, // <--- 添加退货金额
                 type: item.type,     // <--- 添加退货类型
-                count: item.count,   // count 在退货场景似乎不需要? 确认一下
                 quantity: item.quantity, // <--- 添加退货数量
                 isBatchManaged: item.isBatchManaged,
-                batchId: null,
+                batchId: item.batchId,
+                batchNumber:item.batchNumber
             })
         }
 

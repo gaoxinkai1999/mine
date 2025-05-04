@@ -202,9 +202,10 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
                     }
                     Batch batch = batchService.findOne(BatchQuery.builder().id(batchId).build())
                                              .orElseThrow(() -> new MyException("批次不存在: " + batchId));
-                    inventoryService.stockIn(product, batch, detailRequest.getQuantity());
-                    inventoryTransactionService.recordTransactionForReturn(product, batch, detailRequest.getQuantity(), OperationType.退货入库, savedReturnOrder);
-                } else {
+                  detail.setBatch(batch); // Save batch information in ReturnOrderDetail
+                  inventoryService.stockIn(product, batch, detailRequest.getQuantity());
+                  inventoryTransactionService.recordTransactionForReturn(product, batch, detailRequest.getQuantity(), OperationType.退货入库, savedReturnOrder);
+              } else {
                     // 非批次管理商品
                     inventoryService.stockIn(product, detailRequest.getQuantity());
                     inventoryTransactionService.recordTransactionForReturn(product, null, detailRequest.getQuantity(), OperationType.退货入库, savedReturnOrder);
@@ -232,16 +233,28 @@ public class ReturnOrderService implements BaseRepository<ReturnOrder, ReturnOrd
         List<ReturnOrderDetail> details = returnOrderDetailRepository.findByReturnOrderId(returnOrderId);
         for (ReturnOrderDetail detail : details) {
             // 如果是退货退款类型且有退货数量，需要回退库存
-            if (detail.getType().name().equals("退货退款") && 
+            if (detail.getType().name().equals("退货退款") &&
                 detail.getQuantity() != null && detail.getQuantity() > 0) {
                 // 商品退货入库时增加了库存，删除时应减少库存
                 Product product = detail.getProduct();
-               // 减少库存（回退之前的入库操作）
-               inventoryService.stockOut(product, detail.getQuantity());
-              // 记录库存流水 (取消退货订单导致的出库)
-              // 注意：退货通常不关联批次
-              inventoryTransactionService.recordTransactionForReturn(product, null, -detail.getQuantity(), OperationType.取消退货订单, returnOrder);
-               log.info("商品库存已回退: 商品={}, 数量={}", product.getName(), detail.getQuantity());
+
+                if (product.isBatchManaged()) {
+                    // 批次管理商品，回退到特定批次
+                    Batch batch = detail.getBatch();
+                    if (batch == null) {
+                         log.warn("删除退货订单时，批次管理商品详情缺少批次信息: 退货订单详情ID={}", detail.getId());
+                         // 可以选择抛出异常或记录警告并跳过此详情的回退
+                         continue; // 跳过当前详情，继续处理下一个
+                    }
+                    inventoryService.stockOut(product, batch, detail.getQuantity());
+                    inventoryTransactionService.recordTransactionForReturn(product, batch, -detail.getQuantity(), OperationType.取消退货订单, returnOrder);
+                    log.info("批次管理商品库存已回退: 商品={}, 批次={}, 数量={}", product.getName(), batch.getBatchNumber(), detail.getQuantity());
+                } else {
+                    // 非批次管理商品
+                    inventoryService.stockOut(product, detail.getQuantity());
+                    inventoryTransactionService.recordTransactionForReturn(product, null, -detail.getQuantity(), OperationType.取消退货订单, returnOrder);
+                    log.info("非批次管理商品库存已回退: 商品={}, 数量={}", product.getName(), detail.getQuantity());
+                }
             }
         }
         

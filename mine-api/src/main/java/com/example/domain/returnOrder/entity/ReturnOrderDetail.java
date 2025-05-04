@@ -1,5 +1,6 @@
 package com.example.domain.returnOrder.entity;
 
+import com.example.domain.batch.entity.Batch; // Import Batch entity
 import com.example.domain.product.entity.Product;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -35,5 +36,9 @@ public class ReturnOrderDetail {
     
     @Column(name = "quantity")
     private Integer quantity;
+
+    @ManyToOne(fetch = FetchType.LAZY) // Add ManyToOne relationship to Batch
+    @JoinColumn(name = "batch_id") // Assuming a column named batch_id in the database
+    private Batch batch;
 
 }

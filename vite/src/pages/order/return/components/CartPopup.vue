@@ -59,26 +59,13 @@
                 </div>
               </template>
             </van-cell>
-            <!-- 修改 v-if 条件，使用新的 batchLists，并确保 item.isBatchManaged -->
-            <van-cell v-if="item.isBatchManaged && batchLists[item.id] && batchLists[item.id].length > 0">
-              <template #title><span>批次</span></template>
+            <!-- 显示批次号 -->
+            <van-cell v-if="item.isBatchManaged && item.batchId">
+              <template #title><span>批次：</span></template>
               <template #value>
-                <!-- 使用 Vant 的 Picker 或者原生 select -->
-                <select v-model="item.batchId" class="batch-select">
-                  <option v-for="batch in batchLists[item.id]" :key="batch.id" :value="batch.id">
-                    {{ batch.batchNumber }} ({{ batch.expirationDate }}) <!-- 显示批号和过期日期 -->
-                  </option>
-                </select>
+                <!-- 这里暂时显示 batchId，如果需要显示 batchNumber，可能需要调整数据结构或 store -->
+                <span>{{ item.batchNumber }}</span>
               </template>
-            </van-cell>
-            <!-- 添加一个状态，表示正在加载或无可用批次 -->
-            <van-cell v-else-if="item.isBatchManaged && batchLists[item.id] === undefined">
-               <template #title><span>批次</span></template>
-               <template #value><span>加载中...</span></template>
-            </van-cell>
-            <van-cell v-else-if="item.isBatchManaged">
-               <template #title><span>批次</span></template>
-               <template #value><span>无可用批次</span></template>
             </van-cell>
           </div>
         </van-cell-group>
@@ -91,9 +78,8 @@
 
 <script setup>
 import { useReturnOrderStore } from "@/stores/returnOrder.js";
-import { computed, watch, ref } from "vue"; // 导入 watch 和 ref, 移除 onMounted
+import { computed } from "vue";
 import { storeToRefs } from "pinia";
-import api from "@/api";
 
 const store = useReturnOrderStore()
 const cartItems = computed(() => store.cart)
@@ -113,46 +99,6 @@ const removeCartItem = (item) => {
 const getReturnTypeTag = (type) => {
   return type === '仅退款' ? 'primary' : 'warning';
 };
-
-// 使用 ref 来存储批次列表，以便在模板中响应式更新
-const batchLists = ref({}); // key: productId, value: batches array
-
-// 异步获取批次函数
-const fetchBatches = async (item) => {
-  // 检查 item 是否有效以及是否需要获取批次
-  if (!item || !item.id || !item.isBatchManaged) return;
-  // 仅当需要且未获取或获取失败时才重新获取
-  if (!batchLists.value[item.id] || batchLists.value[item.id].length === 0) {
-    try {
-      console.log(`Fetching batches for product ${item.id}`);
-      // *** 确保 API 调用路径正确 ***
-      const batches = await api.returnorder.getReturnableBatches({ productId: item.id });
-      batchLists.value[item.id] = batches || []; // 确保是数组
-      // 如果购物车项还没有 batchId，且获取到了批次，默认选中第一个
-      if (!item.batchId && batches && batches.length > 0) {
-        item.batchId = batches[0].id; // 直接修改 store 中的 cart item
-        console.log(`Default batch set for ${item.id}: ${item.batchId}`);
-      }
-      console.log(`Batches for ${item.id}:`, batches);
-    } catch (e) {
-      console.error(`获取批次列表失败 for product ${item.id}:`, e);
-      batchLists.value[item.id] = []; // 出错时设置为空数组
-    }
-  }
-};
-
-// 监听弹窗显示状态和购物车内容变化
-watch([showCart, cartItems], ([newShowCart, newCartItems]) => {
-  if (newShowCart && newCartItems && newCartItems.length > 0) {
-    console.log("Cart popup shown or cart items changed, fetching batches...");
-    newCartItems.forEach(item => {
-      fetchBatches(item); // 为每个批次管理的商品获取批次
-    });
-  } else if (!newShowCart) {
-    // 可选：弹窗关闭时清空批次缓存，下次打开时重新获取最新数据
-    // batchLists.value = {};
-  }
-}, { immediate: true, deep: true }); // immediate 确保初始加载也执行，deep 监听购物车内部变化
 </script>
 
 <style scoped>
