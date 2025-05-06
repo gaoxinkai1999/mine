@@ -1,15 +1,9 @@
-<route>
-{
-  name: "home"
-}
-</route>
-
 <template>
   <div class="delivery-system">
     <!-- 顶部区域 -->
     <header class="header">
       <div class="header-content">
-        <h1 class="title">门店配送系统aaa</h1>
+        <h1 class="title">门店配送系统</h1>
         <div class="version-info">
           <h3 class="version">v{{ version }}</h3>
           <span class="changelog" v-if="changelog">更新日志:{{ changelog }}</span>

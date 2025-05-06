@@ -1,9 +1,3 @@
-<route>
-{
-  name: "mine"
-}
-</route>
-
 <template>
   <van-pull-refresh v-model="loading" @refresh="onRefresh">
     <div class="statistics-dashboard">

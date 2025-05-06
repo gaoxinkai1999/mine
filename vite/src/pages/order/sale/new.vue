@@ -1,9 +1,3 @@
-<route>
-{
-  name: "order-sale-new"
-}
-</route>
-
 <template>
   <div class="order-page">
     <!-- 顶部导航栏 -->

@@ -1,8 +1,3 @@
-<route>
-  {
-   name: 'order-limit'
-  }
-</route>
 <template>
   <div>
     <van-nav-bar

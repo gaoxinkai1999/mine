@@ -209,7 +209,7 @@ if (-not $SkipBuild -and ($Target -eq 'backend' -or $Target -eq 'all')) {
     Invoke-CommandWithErrorCheck -Command { .\mvnw.cmd clean package -DskipTests } -ErrorMessage "Maven Wrapper 构建失败!"
     
     # 使用从 .env 加载的镜像名，并用 ${} 包裹变量
-    $dockerImageTag = "$($ALIYUN_IMAGE_NAME):${NativeVersionName}"
+    $dockerImageTag = "$($ALIYUN_IMAGE_NAME):${WebVersion}"
     Write-Host "构建 Docker 镜像: $dockerImageTag ..."
     Invoke-CommandWithErrorCheck -Command { docker build -t $dockerImageTag . } -ErrorMessage "Docker build 失败!"
     
@@ -221,7 +221,44 @@ if (-not $SkipBuild -and ($Target -eq 'backend' -or $Target -eq 'all')) {
 
 # --- 步骤 2: 构建前端 ---
 Write-Host "`n=== 步骤 2: 构建前端 ===" -ForegroundColor Cyan
-if (-not $SkipBuild -and ($Target -eq 'web' -or $Target -eq 'all')) {
+# 如果目标是 web, native 或 all，都需要构建前端 (native 需要先构建前端并同步)
+# --- 更新 capacitor.config.json ---
+$capacitorConfigPath = Join-Path $ScriptRoot "vite/capacitor.config.json"
+$devServerUrl = $psEnvConfig.CAPACITOR_SERVER_URL
+
+if (-not (Test-Path $capacitorConfigPath)) {
+    Write-Warning "未找到 capacitor.config.json 文件: $capacitorConfigPath，跳过更新 server.url。"
+} elseif (-not $devServerUrl) {
+    Write-Warning "未在 .env 文件中找到 CAPACITOR_SERVER_URL 变量，跳过更新 server.url。"
+} else {
+    try {
+        Write-Host "更新 capacitor.config.json 中的 server.url 为: $devServerUrl ..." -ForegroundColor DarkGray
+        # 直接读取文件内容进行更新
+        $capConfig = Get-Content $capacitorConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        
+        # 确保 server 对象存在
+        if (-not $capConfig.PSObject.Properties['server']) {
+            $capConfig | Add-Member -MemberType NoteProperty -Name 'server' -Value (New-Object PSObject)
+        }
+        
+        # 更新或添加 url 属性
+        if ($capConfig.server.PSObject.Properties['url']) {
+            $capConfig.server.url = $devServerUrl
+        } else {
+            $capConfig.server | Add-Member -MemberType NoteProperty -Name 'url' -Value $devServerUrl
+        }
+        
+        # 写回文件
+        $capConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $capacitorConfigPath -Encoding UTF8
+        Write-Host "成功更新 capacitor.config.json。" -ForegroundColor Green
+    } catch {
+        Write-Error "更新 capacitor.config.json 时出错: $_"
+        # 根据需要决定是否退出脚本
+        # exit 1
+    }
+}
+# --- 更新逻辑结束 ---
+if (-not $SkipBuild -and ($Target -eq 'web' -or $Target -eq 'native' -or $Target -eq 'all')) {
     $frontendDir = Join-Path $ScriptRoot "vite"
     Write-Host "进入目录: $frontendDir"
     Push-Location $frontendDir
@@ -229,11 +266,14 @@ if (-not $SkipBuild -and ($Target -eq 'web' -or $Target -eq 'all')) {
     Write-Host "运行 npm install (确保依赖最新)..." # 添加 npm install
     Invoke-CommandWithErrorCheck -Command { npm install } -ErrorMessage "npm install 失败!"
 
-    $buildScript = "build:${Environment}" # 使用花括号明确变量名
+    # 根据环境选择正确的脚本后缀
+    $scriptSuffix = if ($Environment -eq 'production') { 'prod' } else { 'dev' }
+    $buildScript = "build:${scriptSuffix}"
     Write-Host "运行前端构建脚本: npm run $buildScript ..."
     Invoke-CommandWithErrorCheck -Command { npm run $buildScript } -ErrorMessage "前端构建 (npm run $buildScript) 失败!"
     
     Write-Host "前端构建完成。" -ForegroundColor Green
+    # npx cap sync 已移动到步骤 3
     Pop-Location
 } else {
     Write-Host "跳过前端构建。" -ForegroundColor Yellow
@@ -242,6 +282,19 @@ if (-not $SkipBuild -and ($Target -eq 'web' -or $Target -eq 'all')) {
 # --- 步骤 3: 构建原生 APK ---
 Write-Host "`n=== 步骤 3: 构建原生 APK ===" -ForegroundColor Cyan
 if (-not $SkipBuild -and ($Target -eq 'native' -or $Target -eq 'all')) {
+    # --- 执行 Capacitor 同步 ---
+    # 需要在 vite 目录下执行
+    $frontendDirForSync = Join-Path $ScriptRoot "vite"
+    Write-Host "进入目录: $frontendDirForSync (用于 Capacitor 同步)"
+    Push-Location $frontendDirForSync
+    
+    Write-Host "运行 Capacitor 同步 (npx cap sync)..."
+    Invoke-CommandWithErrorCheck -Command { npx cap sync } -ErrorMessage "Capacitor 同步 (npx cap sync) 失败!"
+    
+    Pop-Location # 返回 $ScriptRoot
+    Write-Host "Capacitor 同步完成。" -ForegroundColor Green
+    # --- 同步结束 ---
+
     $androidDir = Join-Path $ScriptRoot "vite/android"
     Write-Host "进入目录: $androidDir"
     Push-Location $androidDir
@@ -273,8 +326,8 @@ if (-not $SkipBuild -and ($Target -eq 'native' -or $Target -eq 'all')) {
 Write-Host "`n=== 步骤 4: 部署后端 ===" -ForegroundColor Cyan
 if (-not $SkipDeploy -and ($Target -eq 'backend' -or $Target -eq 'all')) {
     # 使用从 .env 加载的镜像名，并用 ${} 包裹变量
-    $localDockerImage = "$($ALIYUN_IMAGE_NAME):${NativeVersionName}" # 确保这里也一致
-    $aliyunImageTag = "$ALIYUN_REGISTRY_URL/$ALIYUN_NAMESPACE/$($ALIYUN_IMAGE_NAME):${NativeVersionName}" # 使用 ${} 包裹变量
+    $localDockerImage = "$($ALIYUN_IMAGE_NAME):${WebVersion}" # 确保这里也一致
+    $aliyunImageTag = "$ALIYUN_REGISTRY_URL/$ALIYUN_NAMESPACE/$($ALIYUN_IMAGE_NAME):${WebVersion}" # 使用 ${} 包裹变量
 
     Write-Host "登录 Aliyun Docker Registry..."
     Invoke-CommandWithErrorCheck -Command { docker login $ALIYUN_REGISTRY_URL -u $ALIYUN_USER -p $ALIYUN_PASS } -ErrorMessage "Docker login 失败!"
@@ -307,15 +360,63 @@ Write-Host "`n=== 步骤 5: 部署/上传前端资源 ===" -ForegroundColor Cyan
 if (-not $SkipDeploy) {
     $uploadScript = Join-Path $ScriptRoot "vite/upload-to-cos.cjs"
     
-    if ($Target -eq 'web' -or $Target -eq 'all') {
-        Write-Host "上传 Web 静态资源 (vite/dist/)..."
-        $webSource = "vite/dist"
-        $webTarget = "/" # 上传到 Bucket 根目录 (根据需要调整)
-        $ArgumentList = @("`"$uploadScript`"", "--type", "web", "--source", "`"$webSource`"", "--target", "`"$webTarget`"")
-        # Write-Host "执行: node $($ArgumentList -join ' ')" # 移除调试输出
-        Start-Process node -ArgumentList $ArgumentList -Wait -NoNewWindow
-        if ($LASTEXITCODE -ne 0) { Write-Error "上传 Web 资源失败!"; exit 1 }
-        Write-Host "Web 资源上传完成。" -ForegroundColor Green
+    # 如果目标是 web, native 或 all，都需要部署 Web 资源到服务器
+    if ($Target -eq 'web' -or $Target -eq 'native' -or $Target -eq 'all') {
+        # --- 上传 Web 静态资源到服务器 ---
+        $serverWebPath = $psEnvConfig.SERVER_WEB_PATH
+        if (-not $serverWebPath) {
+            Write-Error "错误：.env 文件中未找到 WEB 部署目标路径 SERVER_WEB_PATH。"
+            exit 1
+        }
+        
+        $localWebSourceDir = Join-Path $ScriptRoot "vite/dist"
+        if (-not (Test-Path $localWebSourceDir)) {
+             Write-Error "错误：本地 Web 构建目录未找到: $localWebSourceDir"
+             exit 1
+        }
+
+        Write-Host "通过 SCP 将 Web 静态资源从 '$localWebSourceDir' 上传到服务器 '$($SERVER_USER)@$($SERVER_IP):$($serverWebPath)' ..."
+
+        # 1. 确保远程目录存在 (使用 SSH)
+        # 添加引号以处理可能包含空格的路径
+        $sshMkdirCommand = "mkdir -p '$serverWebPath'"
+        Write-Host "确保远程父目录存在: ssh $SERVER_USER@$SERVER_IP $sshMkdirCommand" -ForegroundColor DarkGray
+        Invoke-CommandWithErrorCheck -Command { ssh "$SERVER_USER@$SERVER_IP" $sshMkdirCommand } -ErrorMessage "通过 SSH 创建远程父目录 '$serverWebPath' 失败!"
+
+        # 2. 删除服务器上可能存在的旧 dist 目录 (确保覆盖)
+        # 注意: 路径拼接需要小心处理斜杠
+        $remoteDistPath = ($serverWebPath -replace '/$') + "/dist" # 确保只有一个斜杠分隔
+        $sshRmCommand = "rm -rf '$remoteDistPath'"
+        Write-Host "删除服务器上的旧目录: ssh $SERVER_USER@$SERVER_IP $sshRmCommand" -ForegroundColor DarkGray
+        # 忽略删除失败 (如果目录不存在)
+        ssh "$SERVER_USER@$SERVER_IP" $sshRmCommand
+        # 不使用 Invoke-CommandWithErrorCheck，因为目录不存在时 rm 会报错，我们希望忽略
+
+        # 3. 使用 scp 上传新的 dist 目录 (-r 递归)
+        # 直接使用本地目录路径作为源，上传整个目录
+        $scpSourcePath = $localWebSourceDir.Replace('\', '/')
+        # 目标路径是服务器上的父目录
+        $scpTargetPath = "$($SERVER_USER)@$($SERVER_IP):$($serverWebPath)"
+
+        Write-Host "执行 SCP 命令: scp -r $scpSourcePath $scpTargetPath" -ForegroundColor DarkGray
+        # scp 可能需要密码或密钥认证，确保 SSH 环境配置正确
+        # 直接调用 scp.exe (假设在 PATH 中)
+        Invoke-CommandWithErrorCheck -Command { scp -r $scpSourcePath $scpTargetPath } -ErrorMessage "通过 SCP 上传 Web 资源失败!"
+
+        # 4. 修复服务器上的文件权限和所有权
+        $remoteDistPathForPerms = "'$remoteDistPath'" # 路径可能包含空格，用引号包裹
+        $sshChownCommand = "chown -R www:www $remoteDistPathForPerms"
+        $sshChmodDirCommand = "find $remoteDistPathForPerms -type d -exec chmod 755 {} \;"
+        $sshChmodFileCommand = "find $remoteDistPathForPerms -type f -exec chmod 644 {} \;"
+        
+        Write-Host "修复服务器上的文件权限 (chown www:www)..." -ForegroundColor DarkGray
+        Invoke-CommandWithErrorCheck -Command { ssh "$SERVER_USER@$SERVER_IP" $sshChownCommand } -ErrorMessage "通过 SSH 执行 chown 失败!"
+        
+        Write-Host "修复服务器上的文件权限 (chmod 755 for dirs, 644 for files)..." -ForegroundColor DarkGray
+        Invoke-CommandWithErrorCheck -Command { ssh "$SERVER_USER@$SERVER_IP" "$sshChmodDirCommand && $sshChmodFileCommand" } -ErrorMessage "通过 SSH 执行 chmod 失败!"
+
+        Write-Host "Web 资源上传并设置权限完成。" -ForegroundColor Green
+        # --- 上传结束 ---
     }
     
     if ($Target -eq 'native' -or $Target -eq 'all') {
@@ -333,6 +434,38 @@ if (-not $SkipDeploy) {
          Write-Host "上传版本配置文件 (dist/cdn-version.json) 到 CDN (/version.json)..."
          $versionSource = Join-Path $DistDir "cdn-version.json" # Use $DistDir
          $versionTarget = "/version.json" # CDN 上的目标路径
+# --- 设置 capacitor.config.json 为开发环境 URL ---
+$devRestoreUrl = "http://192.168.0.102:5173" # 硬编码的开发环境 URL
+# 重新获取路径，以防万一
+$restoreCapacitorConfigPath = Join-Path $ScriptRoot "vite/capacitor.config.json"
+
+if (Test-Path $restoreCapacitorConfigPath) {
+    Write-Host "`n将 capacitor.config.json 的 server.url 设置为开发环境值: $devRestoreUrl ..." -ForegroundColor DarkGray
+    try {
+        $restoreCapConfig = Get-Content $restoreCapacitorConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        
+        # 确保 server 对象存在
+        if (-not $restoreCapConfig.PSObject.Properties['server']) {
+            $restoreCapConfig | Add-Member -MemberType NoteProperty -Name 'server' -Value (New-Object PSObject)
+        }
+
+        # 更新或添加 url 属性为硬编码值
+        if ($restoreCapConfig.server.PSObject.Properties['url']) {
+            $restoreCapConfig.server.url = $devRestoreUrl
+        } else {
+            $restoreCapConfig.server | Add-Member -MemberType NoteProperty -Name 'url' -Value $devRestoreUrl
+        }
+
+        # 写回文件
+        $restoreCapConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $restoreCapacitorConfigPath -Encoding UTF8
+        Write-Host "成功将 capacitor.config.json 设置为开发环境 URL。" -ForegroundColor Green
+    } catch {
+        Write-Error "设置 capacitor.config.json 为开发环境 URL 时出错: $_"
+    }
+} else {
+     Write-Warning "未找到 capacitor.config.json 文件: $restoreCapacitorConfigPath，无法设置开发环境 URL。"
+}
+# --- 设置结束 ---
          $ArgumentList = @("`"$uploadScript`"", "--type", "version", "--source", "`"$versionSource`"", "--target", "`"$versionTarget`"")
          # Write-Host "执行: node $($ArgumentList -join ' ')" # 移除调试输出
          Start-Process node -ArgumentList $ArgumentList -Wait -NoNewWindow

@@ -1,27 +1,38 @@
 package com.example.monitoring.dto; // Updated package
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 用于表示临期批次信息的 DTO
+ * 用于表示临期批次信息的接口投影 (Interface Projection)
+ * Getter 方法名需要与 OrderRepository 中 Native Query 的 SQL 列别名匹配。
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class NearExpiryBatchInfo {
-    private String shopName; // 商家名称
-    private String productName; // 商品名称
-    private String batchNumber; // 批次号
-    private LocalDate productionDate; // 生产日期
-    private Long daysSinceProduction; // 生产距今天数
-    private Integer thresholdDays; // 商品设置的临期阈值（天）
-    private LocalDateTime latestRelevantOrderTime; // 该商家包含批次管理商品的最新订单时间
-    private Integer shopId; // 商家ID
-    private Integer productId; // 商品ID
-    private Integer batchId; // 批次ID
+public interface NearExpiryBatchInfo {
+
+    Integer getShopId(); // 对应 SQL 别名: shopId
+
+    String getShopName(); // 对应 SQL 别名: shopName
+
+    Integer getOrderId(); // 对应 SQL 别名: orderId
+
+    LocalDateTime getLatestOrderTime(); // 对应 SQL 别名: latestOrderTime
+
+    Integer getProductId(); // 对应 SQL 别名: productId
+
+    String getProductName(); // 对应 SQL 别名: productName
+
+    Integer getProductQuantity(); // 对应 SQL 别名: productQuantity
+
+    Integer getBatchId(); // 对应 SQL 别名: batchId
+
+    LocalDate getProductionDate(); // 对应 SQL 别名: productionDate
+
+    Integer getExpiryMonitoringThresholdDays(); // 对应 SQL 别名: expiryMonitoringThresholdDays
+
+    Integer getDaysSinceProduction(); // 对应 SQL 别名: daysSinceProduction
+
+    Integer getOrderDetailId(); // 对应 SQL 别名: orderDetailId
+
+    Integer getSaleBatchDetailId(); // 对应 SQL 别名: saleBatchDetailId
+
 }

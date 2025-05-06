@@ -7,18 +7,13 @@ import 'vant/es/dialog/style'; // 导入 Vant 对话框样式
 
 // --- 配置 ---
 // 后端 API 基础 URL (根据实际部署情况修改)
-// 如果前端和后端部署在同一个域和端口下，可以使用相对路径，否则需要完整 URL
-const API_BASE_URL = 'http://192.168.0.102:8085'; // 假设 Spring Boot 运行在 8080
-const SSE_URL = `${API_BASE_URL}/api/updates/events`; // 指向 Spring Boot SSE 端点
-const LATEST_VERSIONS_URL = `${API_BASE_URL}/api/updates/latest-versions`; // 指向 Spring Boot 版本检查端点
+const CDN_VERSION_URL = 'https://cdn.abocidee.com/version.json'; // 指向 CDN 上的版本文件
 
 // --- 状态变量 ---
-let eventSource = null;
 let isAppActive = true; // 初始假设应用是活动的
 // 使用 Vite 在构建时注入的全局常量来初始化当前 Web 版本
 // 这个变量代表当前运行代码的真实版本，不应在运行时被修改
 const BUILT_APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : null; 
-let fetchedLatestWebVersion = null; // 用于存储从服务器获取的最新版本，以便 SSE 事件比较
 const { downloadAndInstallApk, compareVersions } = useAppUpdate(); // 获取原生下载安装函数和版本比较函数 (假设 compareVersions 在 useAppUpdate 中)
 
 // --- 辅助函数 ---
@@ -52,10 +47,7 @@ function promptWebReload(notes = "") {
  * @param {string} [releaseNotes] 更新日志 (可选，主要在 checkVersions 时提供)
  */
 async function handleWebUpdateCheck(latestWebVersion, releaseNotes) { // 移除默认值 ""
-    // 记录从服务器获取的最新版本号 (如果提供了)
-    if (latestWebVersion) {
-        fetchedLatestWebVersion = latestWebVersion;
-    }
+    // 不再需要存储 fetchedLatestWebVersion
 
     if (BUILT_APP_VERSION === null) {
          console.error("错误：当前运行的 Web 版本未知！检查 vite.config.js define 配置。");
@@ -72,7 +64,9 @@ async function handleWebUpdateCheck(latestWebVersion, releaseNotes) { // 移除�
         let notesToDisplay = releaseNotes;
         if (!notesToDisplay) {
             try {
-                const response = await fetch(LATEST_VERSIONS_URL);
+                // 从 CDN 获取版本信息以获取日志
+                const urlWithTimestamp = `${CDN_VERSION_URL}?t=${Date.now()}`;
+                const response = await fetch(urlWithTimestamp);
                 if (response.ok) {
                     const data = await response.json();
                     notesToDisplay = data.webReleaseNotes; // 获取日志
@@ -141,62 +135,7 @@ async function handleNativeUpdateCheck(latestNativeVersion, apkUrl, releaseNotes
 }
 
 
-// --- SSE 相关函数 ---
-
-/**
- * 启动 SSE 连接的函数
- */
-function startSSE() {
-    if (!isAppActive) {
-        return;
-    }
-    if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
-        return;
-    }
-
-    console.log('尝试连接 SSE 于', SSE_URL);
-    eventSource = new EventSource(SSE_URL);
-
-    eventSource.onopen = () => {
-        console.log('SSE 连接已打开。');
-    };
-
-    // 监听特定事件名 'web-version' (与后端 Service 中 emitter.send 事件名对应)
-    eventSource.addEventListener('web-version', (event) => {
-        console.log('收到 SSE web-version 事件:', event.data);
-        // 注意：SSE 通常只推送版本号，不推送日志。如果需要日志，需在 checkVersions 中获取
-        handleWebUpdateCheck(event.data); 
-    });
-
-    // 可选：处理默认的 message 事件 (如果后端也发送了没有名字的事件)
-    // eventSource.onmessage = (event) => {
-    //     console.log('收到 SSE 默认消息:', event.data);
-    //     // 根据需要处理，可能也是 Web 版本
-    //     handleWebUpdateCheck(event.data);
-    // };
-
-    eventSource.onerror = (err) => {
-        console.error('SSE 错误:', err);
-        eventSource.close(); // 确保在重试前关闭
-        // 仅当应用仍然活动时才重试
-        if (isAppActive) {
-            console.log('SSE 断开，尝试重连...');
-            setTimeout(startSSE, 5000); // 5 秒后重试
-        } else {
-        }
-    };
-}
-
-/**
- * 停止 SSE 连接的函数
- */
-function stopSSE() {
-    if (eventSource) {
-        console.log('正在关闭 SSE 连接。');
-        eventSource.close();
-        eventSource = null;
-    }
-}
+// --- SSE 相关函数 (已移除) ---
 
 // --- 版本检查函数 ---
 
@@ -206,28 +145,26 @@ function stopSSE() {
 async function checkVersions() {
     // console.log('执行版本检查 (Web + Native)...');
     try {
-        const response = await fetch(LATEST_VERSIONS_URL);
+        // 添加时间戳以防止 CDN 缓存旧文件
+        const urlWithTimestamp = `${CDN_VERSION_URL}?t=${Date.now()}`;
+        const response = await fetch(urlWithTimestamp);
         if (!response.ok) {
-            throw new Error(`网络响应不正常: ${response.statusText}`);
+            throw new Error(`获取 CDN 版本文件失败: ${response.statusText}`);
         }
         const data = await response.json(); // 解析 { webVersion, webReleaseNotes, nativeVersion, nativeReleaseNotes, apkUrl }
         // console.log('从后端获取的版本信息:', data);
 
-        // 处理 Web 版本 (传递日志)
-        handleWebUpdateCheck(data.webVersion, data.webReleaseNotes);
+        // 处理 Web 版本 (传递日志) - 使用正确的嵌套路径
+        handleWebUpdateCheck(data.web?.version, data.web?.releaseNotes);
 
         // 处理 Native 版本 (传递日志)
-        handleNativeUpdateCheck(data.nativeVersion, data.apkUrl, data.nativeReleaseNotes);
+        // 处理 Native 版本 (传递日志) - 使用正确的嵌套路径
+        handleNativeUpdateCheck(data.native?.android?.version, data.native?.android?.apkUrl, data.native?.android?.releaseNotes);
 
     } catch (error) {
         console.error('执行版本检查时出错:', error);
-    } finally {
-        // 无论检查结果如何，如果应用是活动的，确保 SSE 连接是启动的
-        if (isAppActive && (!eventSource || eventSource.readyState === EventSource.CLOSED)) {
-            // console.log('版本检查后，确保 SSE 已启动...');
-            startSSE();
-        }
     }
+    // 移除 finally 块中的 SSE 启动逻辑
 }
 
 // --- 服务初始化 ---
@@ -238,16 +175,14 @@ async function checkVersions() {
 export function initializeUpdateService() {
     // 监听 Capacitor 应用状态变化
     App.addListener('appStateChange', ({ isActive }) => {
-        // console.log(`应用状态改变: ${isActive ? '活动' : '非活动'}`);
+        console.log(`应用状态改变: ${isActive ? '活动' : '非活动'}`);
         isAppActive = isActive;
         if (isActive) {
             // 在变为活动状态时立即执行检查
             checkVersions();
             // checkVersions 函数内部会在需要时启动 SSE
-        } else {
-            // 进入后台时停止 SSE
-            stopSSE();
         }
+        // 进入后台时不再需要停止 SSE
     });
 
     // 执行初始检查，如果应用已处于活动状态则启动 SSE
@@ -255,8 +190,7 @@ export function initializeUpdateService() {
         isAppActive = state.isActive;
         if (isAppActive) {
              // console.log('应用初始为活动状态。');
-             checkVersions();
-             // checkVersions 函数内部会在需要时启动 SSE
+             checkVersions(); // 只需执行检查
         } else {
             // console.log('应用初始为非活动状态。');
         }

@@ -1,9 +1,3 @@
-<route>
-{
-name: "shop-create"
-}
-</route>
-
 <template>
   <div>
     <van-nav-bar

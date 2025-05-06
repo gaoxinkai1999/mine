@@ -1,8 +1,3 @@
-<route>
-{
-name: "shop-list"
-}
-</route>
 <template>
 
   <div>

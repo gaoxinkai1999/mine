@@ -5,7 +5,7 @@
  */
 export const ROUTE_NAMES = {
   // 主页
-  HOME: 'home',
+  HOME: 'index', // 对应 pages/index.vue
   
   // 工具页面
   TOOLS: 'tools',
@@ -14,33 +14,34 @@ export const ROUTE_NAMES = {
   MINE: 'mine',
   
   // 商店模块
-  SHOP_LIST: 'shop-list',
-  SHOP_CREATE: 'shop-create',
-  SHOP_DETAIL: 'shop-detail',
+  SHOP_LIST: 'shop',
+  SHOP_CREATE: 'shop-new', // 对应 pages/shop/new.vue
+  SHOP_DETAIL: 'shop-info', // 对应 pages/shop/info.vue
   SHOP_ARREARS: 'shop-arrears',
-  SHOP_MAP: 'shop-map',
+  SHOP_MAP: 'map', // 对应 pages/map/index.vue
   
   // 订单模块
-  ORDER_HOME: 'order-home',
-  ORDER_SALE_LIST: 'order-sale-list',
+  ORDER_HOME: 'order', // 对应 pages/order/index.vue
+  ORDER_SALE_LIST: 'order-sale', // 对应 pages/order/sale/index.vue
   ORDER_SALE_NEW: 'order-sale-new',
   ORDER_RETURN_NEW: 'order-return-new',
   ORDER_LIMIT: 'order-limit',
   // 产品模块
-  PRODUCT_LIST: 'product-list',
+  PRODUCT_LIST: 'product', // 对应 pages/product/index.vue
   PRODUCT_DETAIL: 'product-detail',
   PRODUCT_INVENTORY: 'product-inventory',
   PRODUCT_ORDER_LIST: 'product-order-list',
-  MONITOR_EXPIRY : 'expiry-monitor', // 监控过期
+  MONITOR_EXPIRY : 'monitor-expiry', // 对应 pages/monitor/expiry.vue
+  MONITOR_PROCESSED_HISTORY: 'monitor-processed-history', // 对应 pages/monitor/processed-history.vue
   
   // 采购模块
-  PURCHASE_LIST: 'purchase-list',
+  PURCHASE_LIST: 'purchase', // 对应 pages/purchase/index.vue
   PURCHASE_NEW: 'purchase-new',
   
   // 统计模块
-  STATISTICS_HOME: 'statistics-home',
-  STATISTICS_DAILY: 'statistics-daily',
-  STATISTICS_MONTHLY: 'statistics-monthly',
+  STATISTICS_HOME: 'statistics', // 对应 pages/statistics/index.vue
+  STATISTICS_DAILY: 'statistics-dailyData',
+  STATISTICS_MONTHLY: 'statistics-monthData',
   STATISTICS_CHART: 'statistics-chart',
   STATISTICS_SHOP: 'statistics-shop',
   

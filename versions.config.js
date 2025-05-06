@@ -6,11 +6,11 @@
 
 module.exports = {
   // --- Web 相关 ---
-  webVersion: "1.3.0", // 当前最新的 Web 版本 (发布新 Web 版本时修改这里)
+  webVersion: "1.3.6", // 当前最新的 Web 版本 (发布新 Web 版本时修改这里)
 
   // --- Native (Android) 相关 ---
-  nativeVersionName: "2.1.0", // 当前最新的 Native 版本名 (发布新 Native 版本时修改这里)
-  nativeVersionCode: 210,      // 当前最新的 Native 版本代码 (发布新 Native 版本时修改这里)
+  nativeVersionName: "1.4.5", // 当前最新的 Native 版本名 (发布新 Native 版本时修改这里)
+  nativeVersionCode: 10405,      // 当前最新的 Native 版本代码 (发布新 Native 版本时修改这里)
 
   // --- CDN 和 APK 信息 ---
   cdnBaseUrl: "https://cdn.abocidee.com", // 您的 CDN 基础 URL
@@ -21,7 +21,7 @@ module.exports = {
 
   // --- (可选) 更新说明 ---
   // 每次发布时可以更新这些说明
-  webReleaseNotes: "优化了部分界面。\n修复了已知问题。",
+  webReleaseNotes: "新增了商品临期数据处理功能",
   nativeReleaseNotes: "提升了稳定性。\n优化了用户体验。"
 };
 

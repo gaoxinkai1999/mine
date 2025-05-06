@@ -1,9 +1,3 @@
-<route>
-  {
-    name: 'product-list'
-  }
-</route>
-
 <template>
   <div class="app">
     <!-- 顶部导航栏 -->
@@ -158,6 +152,8 @@
           placeholder="请输入天数 (可选)"
           type="number"
         />
+        <!-- 新增：条码输入框 -->
+        <van-field v-model="newItem.barcode" label="条码" placeholder="请输入商品条码" maxlength="50" />
         <van-field v-model="newItem.category.name" clickable label="品类" placeholder="请选择品类" readonly required
           @click="showPicker = true" />
         <van-popup v-model:show="showPicker" position="bottom">
@@ -255,6 +251,7 @@ export default {
         batchManaged: false,
         costPrice: 0,
         expiryMonitoringThresholdDays: null, // 新增：临期监控阈值
+        barcode: "", // 新增：条码字段
       };
     },
     onPickerConfirm({ selectedOptions }) {
@@ -337,6 +334,7 @@ export default {
         batchManaged: item.batchManaged,
         costPrice: item.costPrice,
         expiryMonitoringThresholdDays: item.expiryMonitoringThresholdDays, // 新增：编辑时加载阈值
+        barcode: item.barcode || "", // 新增：条码字段
       };
       this.isEdit = true;
       this.showAddPopup = true;
@@ -812,103 +810,6 @@ export default {
     height: 24px;
     line-height: 22px;
     font-size: 12px;
-  }
-}
-
-/* 暗色模式优化 */
-@media (prefers-color-scheme: dark) {
-  .app {
-    background: #1c1c1e;
-  }
-
-  .nav-bar {
-    background: rgba(44, 44, 46, 0.95);
-  }
-
-  .nav-title {
-    color: #fff;
-  }
-
-  .sidebar-container {
-    background: #2c2c2e;
-    border-right: 1px solid #3a3a3c;
-  }
-
-  .goods-list-content {
-    background: #2c2c2e;
-  }
-
-  .goods-item,
-  .goods-list {
-    background: #2c2c2e;
-    border-color: #3a3a3c;
-  }
-
-  .drag-handle {
-    background: #3a3a3c;
-  }
-
-  .goods-title {
-    color: #fff;
-  }
-
-  .goods-detail-item {
-    color: #8e8e93;
-  }
-
-  .goods-detail-item .van-icon {
-    color: #666;
-  }
-
-  .category-item span {
-    color: #fff;
-  }
-
-  .empty {
-    color: #8e8e93;
-  }
-
-  :deep(.van-field) {
-    background-color: #2c2c2e;
-  }
-
-  :deep(.van-field__label) {
-    color: #fff;
-  }
-
-  .sortable-ghost {
-    background: #3a3a3c;
-    border-color: #4a4a4c;
-  }
-
-  .sortable-drag {
-    background: #2c2c2e;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  }
-
-  .goods-item:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  }
-
-  .popup-header {
-    background: #2c2c2e;
-    border-bottom-color: #3a3a3c;
-  }
-
-  .popup-title {
-    color: #fff;
-  }
-
-  .category-item {
-    background: #3a3a3c;
-  }
-
-  .category-popup {
-    background: #2c2c2e;
-  }
-
-  .popup-bottom-actions {
-    background: #2c2c2e;
   }
 }
 

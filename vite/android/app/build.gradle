@@ -20,11 +20,10 @@ android {
         
         release {
             // 正式环境签名信息
-            // 使用 CI 解码生成的 keystore 文件
-            storeFile file("release.keystore")
-            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD_ENV")
-            keyAlias System.getenv("ANDROID_KEY_ALIAS_ENV")
-            keyPassword System.getenv("ANDROID_KEY_PASSWORD_ENV")
+            storeFile file("C:\\Users\\g\\Desktop\\key\\gao.jks")  // 实际keystore文件路径
+            storePassword "miaoshidahu"
+            keyAlias "gao"
+            keyPassword "miaoshidahu"
             
             // 更安全的方式是使用环境变量或属性文件获取密码
             // storePassword System.getenv("RELEASE_STORE_PASSWORD") 
@@ -37,8 +36,8 @@ android {
         applicationId "com.example.myappnew"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 210
-        versionName "2.1.0"
+        versionCode 10405
+        versionName "1.4.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -1,9 +1,3 @@
-<route>
-{
-  name: "order-home"
-}
-</route>
-
 <template>
   <div class="order-list-page">
     <!-- 头部区域 -->

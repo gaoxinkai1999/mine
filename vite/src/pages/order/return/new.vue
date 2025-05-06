@@ -1,9 +1,3 @@
-<route>
-{
-  name: "order-return-new"
-}
-</route>
-
 <template>
   <div class="return-order-page">
     <!-- 顶部导航栏 -->
@@ -285,4 +279,4 @@ onBeforeUnmount(() => {
     -webkit-overflow-scrolling: touch;
   }
 }
-</style> 
+</style>

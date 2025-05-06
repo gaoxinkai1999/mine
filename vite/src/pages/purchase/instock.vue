@@ -1,9 +1,3 @@
-<route>
-{
-  name: "purchase-instock"
-}
-</route>
-
 <template>
   <div class="purchase-instock-page">
     <van-nav-bar
@@ -475,4 +469,4 @@ onMounted(() => {
 .cancel-button {
   margin-top: 12px;
 }
-</style> 
+</style>

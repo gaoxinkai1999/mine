@@ -1,8 +1,3 @@
-<route>
-{
-name: "purchase-list"
-}
-</route>
 <template>
   <div class="purchase-list-page">
     <van-nav-bar

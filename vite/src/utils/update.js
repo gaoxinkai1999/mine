@@ -99,15 +99,53 @@ async function downloadAndInstallApk(apkUrl) {
     console.log('下载完成:', downloadResult);
     showLoadingToast({ message: '下载完成，准备安装...', duration: 1000 }); // 短暂提示
     
-    // 获取文件的完整路径 (使用 downloadResult 中的 uri)
-    const fileUri = downloadResult.uri; 
-    if (!fileUri) {
-        throw new Error('下载结果中未找到文件 URI');
+    // 调试：打印完整的下载结果对象
+    console.log('完整的下载结果对象:', downloadResult);
+
+    // 获取文件的完整路径
+    let fileUri = downloadResult?.uri; // 尝试直接获取 uri
+
+    // 如果直接获取 uri 失败，尝试通过返回的 path 构造或获取 uri
+    if (!fileUri && downloadResult?.path) {
+        const potentialPath = downloadResult.path;
+        console.warn('下载结果中未找到 uri，尝试通过 path 获取:', potentialPath);
+        
+        // 检查 path 是否已经是绝对路径
+        if (potentialPath.startsWith('/')) {
+            console.log('Path 是绝对路径，直接构造 URI');
+            // 直接添加 file:// 前缀 (如果尚未存在)
+            fileUri = potentialPath.startsWith('file://') ? potentialPath : `file://${potentialPath}`;
+        } else {
+            // 如果 path 不是绝对路径，才尝试使用 getUri (以防万一)
+            console.log('Path 不是绝对路径，尝试使用 Filesystem.getUri');
+            try {
+                 const uriResult = await Filesystem.getUri({
+                     directory: Directory.Documents, // 确保与下载时使用的目录一致
+                     path: potentialPath
+                 });
+                 fileUri = uriResult?.uri;
+                 if (!fileUri) {
+                     console.error('Filesystem.getUri 未返回有效的 uri');
+                 }
+            } catch (getUriError) {
+                 console.error('通过 Filesystem.getUri 获取 URI 失败:', getUriError);
+                 // 此时 fileUri 仍然是 null 或 undefined
+            }
+        }
+        
+        if (fileUri) {
+             console.log('通过 path 成功获取/构造文件 URI:', fileUri);
+        }
     }
-    console.log('文件 URI:', fileUri);
+
+    // 最终检查 fileUri 是否有效
+    if (!fileUri) {
+        throw new Error('未能获取到有效的 APK 文件 URI');
+    }
+    console.log('最终文件 URI:', fileUri);
     
     // 打开 APK 进行安装
-    await openApk(fileUri); // 直接传递 URI
+    await openApk(fileUri); // 使用获取到的 URI
     
   } catch (error) {
     console.error('下载或安装APK失败:', error);

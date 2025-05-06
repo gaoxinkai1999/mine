@@ -1,9 +1,3 @@
-<route>
-{
-  name: "tools"
-}
-</route>
-
 <template>
   <div class="my-tools">
     <h1 class="page-title">管理工具</h1>
@@ -17,9 +11,9 @@
       <ToolGroup title="设置" :items="settingsItems" />
     </div>
 
-<!--    <div class="additional-tools">-->
-<!--      <van-cell title="地图组件" is-link to="Home" class="tool-item" />-->
-<!--    </div>-->
+    <div class="additional-tools">
+      <van-cell title="测试组件" is-link to="demo" class="tool-item" />
+    </div>
   </div>
 </template>
 

@@ -1,9 +1,3 @@
-<route>
-{
-  name: "purchase-new"
-}
-</route>
-
 <template>
   <div class="purchase-page">
     <!-- 顶部导航 -->

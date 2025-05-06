@@ -1,8 +1,3 @@
-  <route>
-{
-  name: "statistics-shop"
-}
-</route>
 
 <template>
   <div class="custom-table-container">

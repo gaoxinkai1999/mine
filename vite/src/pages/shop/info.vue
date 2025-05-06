@@ -1,9 +1,3 @@
-<route>
-{
-name: "shop-detail"
-}
-</route>
-
 <template>
   <div>
     <van-nav-bar

@@ -1,8 +1,3 @@
-<route>
-{
-  name: "statistics-chart"
-}
-</route>
 
 <template>
   <div >

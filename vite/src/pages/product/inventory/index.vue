@@ -1,9 +1,3 @@
-<route>
-{
-  name: "product-inventory"
-}
-</route>
-
 <template>
   <div class="inventory-container">
     <!-- 顶部导航栏 -->
@@ -481,4 +475,4 @@ onMounted(() => {
     -webkit-overflow-scrolling: touch;
   }
 }
-</style> 
+</style>

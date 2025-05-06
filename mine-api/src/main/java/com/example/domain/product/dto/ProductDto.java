@@ -28,6 +28,7 @@ public class ProductDto implements Serializable {
     private boolean batchManaged;
     private ProductStockDTO productStockDTO;
     private Integer expiryMonitoringThresholdDays; // 商品临期监控阈值（天）
+    private String barcode; // 商品条码
 
 
 }

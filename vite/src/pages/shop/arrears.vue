@@ -1,9 +1,3 @@
-<route>
-{
-  name: "shop-arrears"
-}
-</route>
-
 <template>
   <div class="arrears-page">
     <van-nav-bar
@@ -629,4 +623,3 @@ export default {
   }
 }
 </style>
-/* 样式已被移动到正确的 .list-header 定义中 */

@@ -1,9 +1,3 @@
-<route>
-{
-  name: "product-order-list"
-}
-</route>
-
 <template>
   <div class="product-order-container">
     <!-- 顶部导航栏 -->
@@ -360,4 +354,4 @@ const formatPrice = (price) => {
     font-size: 16px;
   }
 }
-</style> 
+</style>

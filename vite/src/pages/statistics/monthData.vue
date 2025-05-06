@@ -1,8 +1,3 @@
-<route>
-{
-name: "statistics-monthly"
-}
-</route>
 
 <template>
   <van-pull-refresh v-model="loading" @refresh="onRefresh">

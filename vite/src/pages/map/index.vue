@@ -1,9 +1,3 @@
-<route>
-{
-  name: "shop-map"
-}
-</route>
-
 <template>
   <div class="map-page-container">
     <van-nav-bar
@@ -243,4 +237,4 @@ onUnmounted(() => {
   top: 5px !important;
   right: 5px !important;
 }
-</style> 
+</style>
