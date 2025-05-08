@@ -30,7 +30,7 @@ export const ROUTE_NAMES = {
   PRODUCT_LIST: 'product', // 对应 pages/product/index.vue
   PRODUCT_DETAIL: 'product-detail',
   PRODUCT_INVENTORY: 'product-inventory',
-  PRODUCT_ORDER_LIST: 'product-order-list',
+  PRODUCT_ORDER_LIST: 'product-order-list', // 对应 pages/product/order-list.vue
   MONITOR_EXPIRY : 'monitor-expiry', // 对应 pages/monitor/expiry.vue
   MONITOR_PROCESSED_HISTORY: 'monitor-processed-history', // 对应 pages/monitor/processed-history.vue
   

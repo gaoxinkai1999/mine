@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -64,6 +65,21 @@ public class ProductController {
     @PostMapping("/batch-update")
     public void batchUpdate(@RequestBody List<ProductUpdateDto> products) {
         productService.batchUpdate(products);
+    }
+
+    /**
+     * 将非批次管理商品转换为批次管理商品
+     * 
+     * @param productId 商品ID
+     * @param productionDate 初始批次的生产日期
+     */
+    @Operation(summary = "将非批次管理商品转换为批次管理商品", description = "将非批次管理商品转换为批次管理商品，并创建初始批次")
+    @PostMapping("/convertToBatchProduct")
+    public void convertToBatchProduct(@RequestParam Integer productId, @RequestParam(required = false) LocalDate productionDate) {
+        log.info("将商品 ID: {} 转换为批次管理商品，生产日期: {}", productId, productionDate);
+        // 如果未提供生产日期，使用当前日期
+        LocalDate actualProductionDate = productionDate != null ? productionDate : LocalDate.now();
+        productService.convertToBatchProduct(productId, actualProductionDate);
     }
 
 }
