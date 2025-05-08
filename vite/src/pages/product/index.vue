@@ -204,11 +204,11 @@
           label="生产日期" 
           placeholder="点击选择生产日期" 
           readonly
-          @click="showDatePicker = true" 
+          @click="openDatePicker" 
         />
         <van-popup v-model:show="showDatePicker" position="bottom">
           <van-date-picker
-            v-model="convertProductionDate"
+            :model-value="pickerValue"
             title="选择生产日期"
             :min-date="minDate"
             :max-date="maxDate"
@@ -258,10 +258,10 @@ export default {
       draggedElement: null,
       showConvertBatchPopup: false,
       convertItem: {},
-      convertProductionDate: new Date(),
-      formatProductionDate: "",
       showDatePicker: false,
-      minDate: new Date(new Date().setFullYear(new Date().getFullYear() - 1)),
+      pickerValue: new Date(),
+      formatProductionDate: "",
+      minDate: new Date(new Date().getFullYear() - 1, 0, 1),
       maxDate: new Date(),
     };
   },
@@ -479,25 +479,45 @@ export default {
     },
     showConvertToBatchPopup(item) {
       this.convertItem = { ...item };
-      this.convertProductionDate = new Date();
-      this.formatProductionDate = this.formatDate(this.convertProductionDate);
+      // 初始化日期选择器的值为当前日期
+      const currentDate = new Date();
+      this.pickerValue = [
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        currentDate.getDate()
+      ];
+      this.formatProductionDate = this.formatDate(currentDate);
       this.showConvertBatchPopup = true;
     },
     formatDate(date) {
       if (!date) return '';
-      const d = new Date(date);
+      const d = date instanceof Date ? date : new Date(date);
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     },
-    onDateConfirm(value) {
-      this.convertProductionDate = value;
-      this.formatProductionDate = this.formatDate(value);
+    openDatePicker() {
+      this.showDatePicker = true;
+    },
+    onDateConfirm({ selectedValues }) {
+      // 处理选择的日期
+      this.pickerValue = selectedValues;
+      
+      // 将年月日数组转换为日期字符串
+      const [year, month, day] = selectedValues;
+      this.formatProductionDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      
       this.showDatePicker = false;
     },
     async confirmConvertToBatch() {
       try {
+        // 确保有格式化的日期
+        if (!this.formatProductionDate) {
+          const [year, month, day] = this.pickerValue;
+          this.formatProductionDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+        
         await api.product.convertToBatchProduct({
           productId: this.convertItem.id,
           productionDate: this.formatProductionDate
