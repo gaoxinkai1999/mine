@@ -59,6 +59,23 @@ const api = {
       method: 'POST',
       data
     })
+  },
+
+  /**
+   * @description 将非批次管理商品转换为批次管理商品
+   * @url /product/convertToBatchProduct
+   * @method POST
+   * @param {Object} params Query parameters
+   * @param {number} params.productId 商品ID
+   * @param {string} [params.productionDate] 生产日期，可选，默认为当天
+   * @returns {Promise<any>}
+   */
+  convertToBatchProduct(params = {}) {
+    return request({
+      url: '/product/convertToBatchProduct',
+      method: 'POST',
+      params
+    })
   }
 }
 

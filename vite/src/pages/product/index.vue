@@ -83,9 +83,27 @@
                       </div>
                     </div>
                     <div class="goods-actions">
-                      <van-button size="mini" type="primary" plain @click="editItem(element)">编辑</van-button>
-                      <van-button size="mini" type="danger" plain @click="deleteItem(element.id)">删除</van-button>
-                      <van-button size="mini" type="info" plain @click="viewOrderList(element.id,element.name)">销售记录</van-button>
+                      <van-button size="small" type="primary" plain @click="editItem(element)">
+                        <van-icon name="edit" />
+                        <span>编辑</span>
+                      </van-button>
+                      <van-button size="small" type="danger" plain @click="deleteItem(element.id)">
+                        <van-icon name="delete" />
+                        <span>删除</span>
+                      </van-button>
+                      <van-button size="small" type="info" plain @click="viewOrderList(element.id,element.name)">
+                        <van-icon name="orders-o" />
+                        <span>销售记录</span>
+                      </van-button>
+                      <van-button 
+                        v-if="!element.batchManaged" 
+                        size="small" 
+                        type="warning" 
+                        plain 
+                        @click="showConvertToBatchPopup(element)">
+                        <van-icon name="exchange" />
+                        <span>批次转换</span>
+                      </van-button>
                     </div>
                   </div>
                 </div>
@@ -138,12 +156,16 @@
         <van-field v-model="newItem.costPrice" label="成本价" placeholder="请输入成本价" required type="number" />
         <van-field name="radio" label="管理批次" required>
           <template #input>
-            <van-radio-group v-model="newItem.batchManaged" direction="horizontal">
+            <van-radio-group v-model="newItem.batchManaged" direction="horizontal" :disabled="isEdit">
               <van-radio :name="true">是</van-radio>
               <van-radio :name="false">否</van-radio>
             </van-radio-group>
           </template>
         </van-field>
+        <!-- 在编辑模式下添加提示信息 -->
+        <div v-if="isEdit" class="field-tip">
+          批次管理状态不可直接修改。非批次商品需通过"批次转换"功能转为批次管理。
+        </div>
         <!-- 新增：临期监控阈值 -->
         <van-field
           v-if="newItem.batchManaged"
@@ -166,6 +188,40 @@
       </div>
     </van-popup>
 
+    <!-- 批次转换弹出层 -->
+    <van-popup v-model:show="showConvertBatchPopup" :style="{ height: 'auto', padding: '16px' }" position="bottom">
+      <div class="popup-content">
+        <div class="popup-header">
+          <div class="popup-title">转换为批次管理商品</div>
+        </div>
+        <div style="margin-top: 16px;">
+          <p>确定要将商品 <b>{{ convertItem.name }}</b> 转换为批次管理商品吗？</p>
+          <p class="warning-text">此操作不可逆，转换后商品将使用批次管理模式！</p>
+          <p>若现有库存数量大于0，将创建一个初始批次。</p>
+        </div>
+        <van-field 
+          v-model="formatProductionDate" 
+          label="生产日期" 
+          placeholder="点击选择生产日期" 
+          readonly
+          @click="showDatePicker = true" 
+        />
+        <van-popup v-model:show="showDatePicker" position="bottom">
+          <van-date-picker
+            v-model="convertProductionDate"
+            title="选择生产日期"
+            :min-date="minDate"
+            :max-date="maxDate"
+            @confirm="onDateConfirm"
+            @cancel="showDatePicker = false"
+          />
+        </van-popup>
+        <div class="popup-actions">
+          <van-button block type="primary" @click="confirmConvertToBatch">确认转换</van-button>
+          <van-button block type="default" @click="cancelConvertToBatch">取消</van-button>
+        </div>
+      </div>
+    </van-popup>
 
   </div>
 </template>
@@ -200,6 +256,13 @@ export default {
       touchStartTime: 0,
       isDragging: false,
       draggedElement: null,
+      showConvertBatchPopup: false,
+      convertItem: {},
+      convertProductionDate: new Date(),
+      formatProductionDate: "",
+      showDatePicker: false,
+      minDate: new Date(new Date().setFullYear(new Date().getFullYear() - 1)),
+      maxDate: new Date(),
     };
   },
   computed: {
@@ -250,8 +313,8 @@ export default {
         category: { id: null, name: "" },
         batchManaged: false,
         costPrice: 0,
-        expiryMonitoringThresholdDays: null, // 新增：临期监控阈值
-        barcode: "", // 新增：条码字段
+        expiryMonitoringThresholdDays: null,
+        barcode: "",
       };
     },
     onPickerConfirm({ selectedOptions }) {
@@ -264,16 +327,13 @@ export default {
       this.isDragging = true;
       this.draggedElement = e.item;
       
-      // 开始拖拽时，让元素在硬件加速层上运行，提高性能
       if (this.draggedElement) {
         this.draggedElement.style.willChange = 'transform';
         this.draggedElement.style.transform = 'translateZ(0)';
       }
       
-      // 添加CSS类避免过多重新计算布局
       document.body.classList.add('dragging-active');
       
-      // 禁用其他触摸事件，防止滚动冲突
       document.addEventListener('touchmove', this.preventDefaultTouchMove, { passive: false });
     },
     
@@ -333,8 +393,8 @@ export default {
         category: { id: item.categoryId, name: this.categories.find(c => c.id === item.categoryId).name },
         batchManaged: item.batchManaged,
         costPrice: item.costPrice,
-        expiryMonitoringThresholdDays: item.expiryMonitoringThresholdDays, // 新增：编辑时加载阈值
-        barcode: item.barcode || "", // 新增：条码字段
+        expiryMonitoringThresholdDays: item.expiryMonitoringThresholdDays,
+        barcode: item.barcode || "",
       };
       this.isEdit = true;
       this.showAddPopup = true;
@@ -349,6 +409,13 @@ export default {
 
       try {
         if (this.isEdit) {
+          // 获取原始商品数据
+          const originalProduct = this.goodsList.find(item => item.id === this.newItem.id);
+          if (originalProduct) {
+            // 确保在编辑模式下保留原批次管理状态
+            this.newItem.batchManaged = originalProduct.batchManaged;
+          }
+          
           await api.product.batchUpdate([this.newItem]);
           await this.init()
         } else {
@@ -374,11 +441,9 @@ export default {
       return true;
     },
     async onDragEnd(evt) {
-      // 移除拖拽时添加的CSS类
       document.body.classList.remove('dragging-active');
       document.removeEventListener('touchmove', this.preventDefaultTouchMove);
       
-      // 恢复拖拽元素的默认样式
       if (this.draggedElement) {
         this.draggedElement.style.willChange = 'auto';
         this.draggedElement.style.transform = '';
@@ -387,7 +452,6 @@ export default {
       
       this.isDragging = false;
       
-      // 如果没有实际移动位置，不进行更新操作
       if (evt.oldIndex === evt.newIndex) return;
       
       try {
@@ -407,18 +471,55 @@ export default {
       await this.getCategories();
       await this.getProducts();
     },
-    viewOrderList(productId,productName) {
+    viewOrderList(productId, productName) {
       this.$router.push({
         name: ROUTE_NAMES.PRODUCT_ORDER_LIST,
-        query: { productId,productName }
+        query: { productId, productName }
       });
+    },
+    showConvertToBatchPopup(item) {
+      this.convertItem = { ...item };
+      this.convertProductionDate = new Date();
+      this.formatProductionDate = this.formatDate(this.convertProductionDate);
+      this.showConvertBatchPopup = true;
+    },
+    formatDate(date) {
+      if (!date) return '';
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    },
+    onDateConfirm(value) {
+      this.convertProductionDate = value;
+      this.formatProductionDate = this.formatDate(value);
+      this.showDatePicker = false;
+    },
+    async confirmConvertToBatch() {
+      try {
+        await api.product.convertToBatchProduct({
+          productId: this.convertItem.id,
+          productionDate: this.formatProductionDate
+        });
+        
+        showSuccessToast("商品已转换为批次管理");
+        this.showConvertBatchPopup = false;
+        
+        await this.getProducts();
+      } catch (error) {
+        console.error('转换批次管理失败:', error);
+        showFailToast("转换失败：" + (error.message || '未知错误'));
+      }
+    },
+    cancelConvertToBatch() {
+      this.showConvertBatchPopup = false;
     },
   },
   async mounted() {
     await this.init()
   },
   beforeUnmount() {
-    // 清理事件监听器
     document.removeEventListener('touchmove', this.preventDefaultTouchMove);
   }
 };
@@ -526,12 +627,20 @@ export default {
   display: flex;
   border: 1px solid #ebedf0;
   will-change: transform;
-  transition: box-shadow 0.2s ease;
+  transition: all 0.25s ease;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.goods-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  border-color: #dcdee0;
 }
 
 .drag-handle {
   width: 48px;
-  background: #f7f8fa;
+  background: #f8f9fa;
   color: #999;
   display: flex;
   align-items: center;
@@ -541,10 +650,18 @@ export default {
   user-select: none;
   cursor: grab;
   font-size: 20px;
+  border-right: 1px solid #ebedf0;
+  transition: background-color 0.2s;
+}
+
+.drag-handle:hover {
+  background: #f2f3f5;
+  color: #666;
 }
 
 .drag-handle:active {
   cursor: grabbing;
+  background: #ebedf0;
 }
 
 .goods-content {
@@ -552,12 +669,13 @@ export default {
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .goods-header {
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
 }
 
 .goods-title {
@@ -572,23 +690,104 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  color: #666;
 }
 
 .goods-detail-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #666;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.goods-detail-item :deep(.van-icon) {
+  font-size: 16px;
+  color: #969799;
 }
 
 .goods-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 10px;
 }
 
-/* 弹出层样式优化 */
+.goods-actions :deep(.van-button) {
+  flex-shrink: 0;
+  min-width: 64px;
+  font-size: 12px;
+  padding: 0 8px;
+  height: 30px;
+  border-radius: 4px;
+  line-height: 28px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.goods-actions :deep(.van-button .van-icon) {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+.goods-actions :deep(.van-button:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.goods-actions :deep(.van-button--primary.van-button--plain) {
+  color: var(--van-primary-color);
+  border-color: var(--van-primary-color);
+}
+
+.goods-actions :deep(.van-button--danger.van-button--plain) {
+  color: var(--van-danger-color);
+  border-color: var(--van-danger-color);
+}
+
+.goods-actions :deep(.van-button--warning.van-button--plain) {
+  color: var(--van-warning-color);
+  border-color: var(--van-warning-color);
+}
+
+.goods-actions :deep(.van-button--info.van-button--plain) {
+  color: var(--van-info-color);
+  border-color: var(--van-info-color);
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+  .goods-actions {
+    gap: 6px;
+  }
+  
+  .goods-actions :deep(.van-button) {
+    min-width: auto;
+    padding: 0 6px;
+    height: 28px;
+    line-height: 26px;
+    font-size: 11px;
+  }
+  
+  .goods-actions :deep(.van-button .van-icon) {
+    margin-right: 3px;
+    font-size: 12px;
+  }
+}
+
+/* 超小屏幕调整 */
+@media (max-width: 360px) {
+  .goods-actions :deep(.van-button) {
+    height: 26px;
+    line-height: 24px;
+    font-size: 10px;
+    padding: 0 4px;
+  }
+}
+
 .popup-content {
   padding: 20px 16px;
   padding-bottom: max(16px, env(safe-area-inset-bottom));
@@ -610,7 +809,6 @@ export default {
   font-size: 16px;
 }
 
-/* 品类管理样式优化 */
 .popup-header {
   position: sticky;
   top: 0;
@@ -667,7 +865,6 @@ export default {
   gap: 12px;
 }
 
-/* 拖拽效果优化 */
 .sortable-ghost {
   opacity: 0.5;
   background: #f2f3f5;
@@ -698,7 +895,6 @@ export default {
   cursor: grabbing !important;
 }
 
-/* 表单字段样式优化 */
 :deep(.van-field) {
   margin-bottom: 16px;
   border-radius: 8px;
@@ -724,7 +920,6 @@ export default {
   font-size: 14px;
 }
 
-/* 响应式布局优化 */
 @media screen and (max-width: 768px) {
   .app {
     padding: 0;
@@ -759,7 +954,6 @@ export default {
   }
 }
 
-/* 超小屏幕适配 */
 @media screen and (max-width: 360px) {
   .nav-bar {
     padding: env(safe-area-inset-top) 8px 0;
@@ -813,7 +1007,6 @@ export default {
   }
 }
 
-/* 滚动条美化 */
 .goods-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -841,6 +1034,28 @@ export default {
   .goods-item:active {
     background: rgba(0, 0, 0, 0.05);
   }
+}
+
+.sortable-drag, .sortable-ghost, .sortable-chosen {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* 批次转换弹窗样式 */
+.warning-text {
+  color: #ff976a;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+/* 字段提示样式 */
+.field-tip {
+  color: #ff976a;
+  font-size: 12px;
+  margin: -8px 0 12px 16px;
+  line-height: 1.4;
 }
 
 /* 添加硬件加速 */

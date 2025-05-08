@@ -1,5 +1,7 @@
 package com.example.domain.product.service;
 
+import com.example.domain.batch.entity.Batch;
+import com.example.domain.batch.repository.BatchRepository;
 import com.example.domain.batch.service.BatchService;
 import com.example.domain.inventory.entity.Inventory;
 import com.example.domain.inventory.repository.InventoryRepository;
@@ -16,6 +18,7 @@ import com.example.domain.shop.service.ShopService;
 import com.example.exception.MyException;
 import com.example.interfaces.BaseRepository;
 import com.example.query.CategoryQuery;
+import com.example.query.InventoryQuery;
 import com.example.query.ProductQuery;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
@@ -28,7 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -50,7 +55,9 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
 
     @Autowired
     private BatchService batchService; // 批次服务
-
+    
+    @Autowired
+    private BatchRepository batchRepository; // 批次仓库
 
     @Autowired
     private ProductMapper productMapper; // 产品映射器，用于对象转换
@@ -231,80 +238,6 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
 
     }
 
-
-    // /**
-    //  * 将非批次商品转换为批次商品
-    //  *
-    //  * @param productId 商品ID
-    //  * @return 转换后的商品
-    //  */
-    // @Transactional
-    // public Product convertToBatchProduct(Integer productId) {
-    //     Product product = this.findOne(ProductQuery.builder()
-    //                                                .id(productId)
-    //                                                .build())
-    //                           .orElseThrow(() -> new MyException("商品不存在: " + productId));
-    //     if (product.isBatchManaged()) {
-    //         throw new MyException("商品已经是批次管理商品: " + product.getName());
-    //     }
-    //
-    //     // 商品设置为批次管理
-    //     product.setBatchManaged(true);
-    //     productRepository.save(product);
-    //
-    //     // 创建默认批次（可选）
-    //     Batch defaultBatch = new Batch();
-    //     defaultBatch.setProduct(product);
-    //     defaultBatch.setBatchNumber("DEFAULT_BATCH"); // 这里可以根据需求生成批次号
-    //     defaultBatch.setStatus(true);
-    //     // 其他必要的字段可以设置为默认值
-    //     Batch batch = batchService.saveBatch(defaultBatch);
-    //
-    //     // 检查并初始化库存记录
-    //     Inventory inventory = inventoryService.findOrCreateInventory(product, null);
-    //     InventoryUpdateDto inventoryUpdateDto = new InventoryUpdateDto();
-    //     inventoryUpdateDto.setId(inventory.getId());
-    //     inventoryUpdateDto.setProductId(productId);
-    //     inventoryUpdateDto.setBatchId(batch.getId());
-    //     inventoryService.batchUpdate(List.of(inventoryUpdateDto));
-    //
-    //     return product;
-    // }
-    //
-    // /**
-    //  * 将批次商品转换为非批次商品
-    //  *
-    //  * @param productId 商品ID
-    //  * @return 转换后的商品
-    //  */
-    // @Transactional
-    // public Product convertToNonBatchProduct(Integer productId) {
-    //     Product product = this.findOne(ProductQuery.builder()
-    //                                                .id(productId)
-    //                                                .build())
-    //                           .orElseThrow(() -> new MyException("商品不存在: " + productId));
-    //
-    //     if (!product.isBatchManaged()) {
-    //         throw new MyException("商品已经是非批次管理商品: " + product.getName());
-    //     }
-    //
-    //     // 设置为非批次管理
-    //     product.setBatchManaged(false);
-    //     productRepository.save(product);
-    //
-    //     // 删除所有相关批次（可选）
-    //     List<Batch> batches = batchService.findByProduct(productId, true);
-    //     for (Batch batch : batches) {
-    //         batchService.deleteBatch(batch.getId());
-    //     }
-    //
-    //     // 更新库存记录，确保库存与非批次管理状态一致
-    //     Inventory inventory = inventoryService.findOrCreateInventory(product, null);
-    //     inventoryService.updateInventory(product.getId(), -inventory.getQuantity(), OperationType.销售出库, null); // Adjust inventory
-    //
-    //     return product;
-    // }
-
     /**
      * 根据商品ID获取商品最早销售日期
      *
@@ -314,6 +247,70 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
     public LocalDate getEarliestSaleDateByProductId(Integer productId) {
         // 调用ProductRepository的方法获取最早销售日期
         return productRepository.findEarliestSaleDateByProductId(productId);
+    }
+
+    @Transactional
+    public void convertToBatchProduct(Integer productId, LocalDate productionDate) {
+        // 1. 验证商品
+        Product product = productRepository.findById(productId)
+                                           .orElseThrow(() -> new MyException("商品不存在: " + productId));
+        if (product.isBatchManaged()) {
+            throw new MyException("商品已经是批次管理商品: " + product.getName());
+        }
+
+        // 2. 查询现有非批次库存
+        Optional<Inventory> existingInventoryOpt = inventoryService.findOne(
+                InventoryQuery.builder().productId(productId).batchId(null).build() // 显式查找 batchId 为 null 的
+        );
+
+        Inventory existingInventory = existingInventoryOpt.orElse(null);
+        int currentQuantity = (existingInventory != null) ? existingInventory.getQuantity() : 0;
+        log.info("商品ID: {}, 名称: {}, 现有非批次库存数量: {}", productId, product.getName(), currentQuantity);
+
+        Batch initialBatch = null; // 初始化为 null
+
+        // 3. 如果有库存，创建初始批次并更新库存记录
+        if (currentQuantity > 0) {
+            if (existingInventory == null) {
+                // 按理说，如果 quantity > 0，应该存在 inventory 记录，但为了健壮性处理
+                throw new MyException("库存数据异常：存在数量但未找到对应的非批次库存记录");
+            }
+            // 3.1 创建初始批次
+            initialBatch = new Batch();
+            initialBatch.setProduct(product);
+            initialBatch.setProductionDate(productionDate);
+            // 处理批次号，自动生成
+            String batchNum = batchService.generateBatchNumber(productionDate);
+            initialBatch.setBatchNumber(batchNum);
+            initialBatch.setCostPrice(product.getCostPrice());
+            initialBatch.setStatus(true);
+            initialBatch.setCreatedTime(LocalDateTime.now());
+            // 注意：不设置 purchaseDetail，因为这是转换现有库存创建的初始批次
+
+            initialBatch = batchRepository.save(initialBatch); // 保存批次获取ID
+            log.info("商品ID: {}, 创建初始批次: ID={}, 批次号={}", productId, initialBatch.getId(), batchNum);
+
+            // 3.2 更新库存记录以关联到新批次
+            existingInventory.setBatch(initialBatch); // 关联批次
+            inventoryRepository.save(existingInventory); // 保存更新
+            log.info("商品ID: {}, 现有库存 {} 已关联到初始批次ID: {}", productId, currentQuantity, initialBatch.getId());
+
+        } else {
+            // 如果现有库存为0，检查是否仍存在旧的 batchId 为 NULL 的记录，如果存在可以考虑删除或保留
+            if (existingInventory != null) {
+                // 可选：删除数量为0的旧库存记录
+                // inventoryRepository.delete(existingInventory);
+                log.info("商品ID: {}, 现有非批次库存为0，保留原库存记录", productId);
+            } else {
+                log.info("商品ID: {}, 无现有非批次库存记录", productId);
+            }
+        }
+
+        // 4. 更新商品为批次管理
+        product.setBatchManaged(true);
+        productRepository.save(product);
+
+        log.info("商品ID: {} 已成功转换为批次管理商品。", productId);
     }
 
 }

@@ -163,7 +163,7 @@ public class BatchService implements BaseRepository<Batch, BatchQuery> {
     }
 
 
-    private String generateBatchNumber(LocalDate productionDate){
+    public String generateBatchNumber(LocalDate productionDate){
 
         return productionDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
     }
