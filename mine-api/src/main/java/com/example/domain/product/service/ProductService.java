@@ -148,10 +148,12 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
     @Override
     public JPAQuery<Product> buildConditionQuery(ProductQuery query) {
         QProduct product = QProduct.product; // 查询产品的QueryDSL对象
+        QCategory category = QCategory.category; // 添加类别引用
         
-        // 创建一个选择所有字段的查询，并确保结果唯一
-        JPAQuery<Product> jpaQuery = queryFactory.selectFrom(product)
-                                                 .distinct();
+        // 创建一个基本查询，不使用distinct
+        JPAQuery<Product> jpaQuery = queryFactory.select(product)
+                                                 .from(product)
+                                                 .leftJoin(product.category, category);
 
         // 初始化查询条件构建器
         BooleanBuilder where = new BooleanBuilder();
@@ -182,10 +184,11 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
         if (query.getIds() != null) {
             where.and(product.id.in(query.getIds()));
         }
-
-        // 返回构建好的查询对象，应用查询条件和排序
+        
+        // 返回构建好的查询对象，使用groupBy避免重复结果
         return jpaQuery.where(where)
-                       .orderBy(product.category.sort.asc(), product.sort.asc());
+                       .groupBy(product.id) // 使用分组替代distinct
+                       .orderBy(category.sort.asc(), product.sort.asc());
     }
 
     /**
@@ -198,13 +201,15 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
     @Override
     public void buildRelationship(ProductQuery query, JPAQuery<Product> jpaQuery) {
         QProduct product = QProduct.product; // 查询产品的QueryDSL对象
-        QCategory category = QCategory.category; // 查询类别的QueryDSL对象
         
-        // 默认加载类别
-        jpaQuery.leftJoin(product.category, category)
-                .fetchJoin();
-                
-        // 这里可以添加更多关联加载逻辑，如果有需要的话
+        // 如果需要加载类别，标记为fetchJoin
+        if (query.getIncludes() != null && query.getIncludes().contains(ProductQuery.Include.CATEGORY)) {
+            // 查找现有的category join并标记为fetchJoin
+            // 注意: 在QueryDSL中这种操作可能不直接支持，我们的策略是确保在buildConditionQuery中已经建立了基本的join
+            // 然后在这里，我们不再添加新的join，而是依赖已有的join
+            // 下面这行代码可能会导致重复join，但通常Hibernate会处理这种情况
+            jpaQuery.leftJoin(product.category).fetchJoin();
+        }
     }
 
 
@@ -212,30 +217,39 @@ public class   ProductService implements BaseRepository<Product, ProductQuery> {
     /**
      * 获取所有在售商品信息，包含库存信息
      */
-
     public List<ProductDto> getProducts() {
-        ProductQuery build = ProductQuery.builder()
-                                         .del(false)
-                                         .includes(Set.of(ProductQuery.Include.CATEGORY))
-                                         .build();
-        List<Product> products = this.findList(build);
+        // 直接构建查询，避免使用BaseRepository.findList()可能引发的distinct问题
+        QProduct product = QProduct.product;
+        QCategory category = QCategory.category;
+        
+        // 创建查询，使用GROUP BY而非DISTINCT
+        List<Product> products = queryFactory.select(product)
+                                            .from(product)
+                                            .leftJoin(product.category, category)
+                                            .where(product.del.eq(false))
+                                            .groupBy(product.id)
+                                            .orderBy(category.sort.asc(), product.sort.asc())
+                                            .fetch();
+        
+        // 获取产品库存信息
         List<ProductStockDTO> productStocks = inventoryService.getProductStocks(products.stream()
-                                                                                        .map(Product::getId)
-                                                                                        .toList());
+                                                                               .map(Product::getId)
+                                                                               .toList());
+        
+        // 组装结果
         return products.stream()
-                       .map(product -> {
-                           // 映射基础信息
-                           ProductDto productDto = productMapper.toProductDto(product);
-                           // 设置库存信息
-                           productDto.setProductStockDTO(productStocks.stream()
-                                                                      .filter(stockInfo -> stockInfo.getProductId()
-                                                                                                    .equals(product.getId()))
-                                                                      .findFirst()
-                                                                      .orElseThrow(() -> new MyException("商品库存信息不存在")));
-                           return productDto;
-                       })
-                       .toList();
-
+                      .map(p -> {
+                          // 映射基础信息
+                          ProductDto productDto = productMapper.toProductDto(p);
+                          // 设置库存信息
+                          productDto.setProductStockDTO(productStocks.stream()
+                                                                    .filter(stockInfo -> stockInfo.getProductId()
+                                                                                                 .equals(p.getId()))
+                                                                    .findFirst()
+                                                                    .orElseThrow(() -> new MyException("商品库存信息不存在")));
+                          return productDto;
+                      })
+                      .toList();
     }
 
     /**

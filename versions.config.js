@@ -6,7 +6,7 @@
 
 module.exports = {
   // --- Web 相关 ---
-  webVersion: "1.3.7", // 当前最新的 Web 版本 (发布新 Web 版本时修改这里)
+  webVersion: "1.3.8", // 当前最新的 Web 版本 (发布新 Web 版本时修改这里)
 
   // --- Native (Android) 相关 ---
   nativeVersionName: "1.4.5", // 当前最新的 Native 版本名 (发布新 Native 版本时修改这里)
