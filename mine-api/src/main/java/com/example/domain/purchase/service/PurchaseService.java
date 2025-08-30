@@ -4,10 +4,10 @@ import com.example.domain.batch.entity.Batch;
 import com.example.domain.batch.entity.QBatch;
 import com.example.domain.batch.service.BatchService;
 import com.example.domain.forecast.service.ForecastService;
+import com.example.domain.inventory.dto.OperationType;
 import com.example.domain.inventory.entity.Inventory;
-import com.example.domain.inventory.dto.OperationType; // 添加 OperationType 导入
 import com.example.domain.inventory.service.InventoryService;
-import com.example.domain.inventory.service.InventoryTransactionService; // 添加 InventoryTransactionService 导入
+import com.example.domain.inventory.service.InventoryTransactionService;
 import com.example.domain.product.dto.ProductDto;
 import com.example.domain.product.entity.Product;
 import com.example.domain.product.entity.QProduct;
@@ -40,6 +40,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 采购管理服务
@@ -314,8 +315,8 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
      */
     public Map<Integer, Map<String, Integer>> calculatePurchaseQuantity(int[] productIds) {
         Map<Integer, Map<String, Integer>> productIdQuantityMap = new HashMap<>();
-        int forecastHorizonDays = 4; // 预测未来多少天
-        int warningStockDays = 1;    // 预警库存覆盖的天数
+        int forecastHorizonDays = 30; // 预测未来多少天
+        int warningStockDays = 5;    // 预警库存覆盖的天数
 
         // 1. 获取足够长的历史销售数据 (例如过去 1 年 + 预测期，以便季节性模型有足够数据)
         //    注意：具体需要多长的数据取决于最复杂模型的需求 (HoltWintersSeasonal 需要至少 1 年)
@@ -327,43 +328,70 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
         Map<LocalDate, SalesStatisticsDTO> historicalDataMap = statisticsService.calculateDailyStatistics(startDate, endDate);
         log.info("获取到 {} 天的历史销售统计数据。", historicalDataMap.size());
 
-
-        // 2. 遍历每个商品进行预测
-        Arrays.stream(productIds)
-              // 可以考虑并行处理以提高效率
-              .forEach(productId -> {
-                  double totalForecastQuantity =0;
-                  try {
-                      log.info("商品ID: {} 开始预测未来 {} 周销量...", productId, forecastHorizonDays);
-                      // 调用重构后的 ForecastService 方法
-                      double[] forecast = forecastService.forecastProductTotal(productId, historicalDataMap, forecastHorizonDays);
-                      totalForecastQuantity = Arrays.stream(forecast).sum();
-                      log.info("商品ID: {} 预测未来 {} 周总销量: {}", productId, forecastHorizonDays, totalForecastQuantity);
-
-                      double warningStock = forecast[0] ;
-                      log.info("商品ID: {} 预警库存: {}", productId, warningStock);
-                      // 存储结果 (确保为整数)
-                      productIdQuantityMap.put(productId, Map.of(
-                              "forecastQuantity", (int) Math.round(totalForecastQuantity),
-                              "warningQuantity", (int) Math.round(warningStock)
-                      ));
-
-                  } catch (MyException e) {
-                      // 记录预测失败的商品
-                      log.error("商品ID: {} 预测销量计算失败: {}", productId, e.getMessage());
-                      // 可以选择放入 null 或特定的错误标记
-                      productIdQuantityMap.put(productId, null);
-                  } catch (Exception e) {
-                      // 捕获其他意外异常
-                      log.error("商品ID: {} 预测过程中发生意外错误: {}", productId, e.getMessage(), e);
-                      productIdQuantityMap.put(productId, null);
-                  }
-              });
+        // 2. 使用自定义线程池的异步方式预测所有商品，提高效率并控制资源使用
+        List<CompletableFuture<Map.Entry<Integer, double[]>>> futures = new ArrayList<>();
+        
+        // 为每个商品创建一个异步任务，使用自定义线程池
+        for (int productId : productIds) {
+            CompletableFuture<double[]> forecastFuture = forecastService.forecastProductTotalWithCustomExecutor(
+                productId, 
+                historicalDataMap, 
+                forecastHorizonDays
+            );
+            
+            // 将结果和商品ID关联起来
+            CompletableFuture<Map.Entry<Integer, double[]>> resultFuture = forecastFuture.thenApply(
+                forecast -> new AbstractMap.SimpleEntry<>(productId, forecast)
+            );
+            
+            futures.add(resultFuture);
+            log.debug("已提交商品ID: {} 的异步预测任务", productId);
+        }
+        
+        // 等待所有异步任务完成并收集结果
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        
+        // 处理每个预测结果
+        for (CompletableFuture<Map.Entry<Integer, double[]>> future : futures) {
+            try {
+                Map.Entry<Integer, double[]> entry = future.get();
+                int productId = entry.getKey();
+                double[] forecast = entry.getValue();
+                
+                // 计算预测总销量
+                double totalForecastQuantity = Arrays.stream(forecast).sum();
+                log.info("商品ID: {} 预测未来 {} 天总销量: {}", productId, forecastHorizonDays, totalForecastQuantity);
+                
+                // 计算预警库存（第一天的预测销量）
+                double warningStock = Arrays.stream(forecast).limit(warningStockDays).sum();
+                log.info("商品ID: {} 预警库存: {}", productId, warningStock);
+                
+                // 存储结果 (确保为整数)
+                productIdQuantityMap.put(productId, Map.of(
+                        "forecastQuantity", (int) Math.round(totalForecastQuantity),
+                        "warningQuantity", (int) Math.round(warningStock)
+                ));
+            } catch (Exception e) {
+                // 处理异常情况
+                int productId = -1;
+                try {
+                    // 尝试获取商品ID（如果可能的话）
+                    productId = future.get().getKey();
+                } catch (Exception ex) {
+                    log.error("无法获取预测失败商品的ID: {}", ex.getMessage());
+                }
+                
+                if (productId != -1) {
+                    log.error("商品ID: {} 预测过程中发生错误: {}", productId, e.getMessage());
+                    productIdQuantityMap.put(productId, null);
+                }
+            }
+        }
 
         log.info("采购数量计算完成，成功预测 {} 个商品。", productIdQuantityMap.values()
-                                                                             .stream()
-                                                                             .filter(v -> v != null)
-                                                                             .count());
+                                                                            .stream()
+                                                                            .filter(v -> v != null)
+                                                                            .count());
         return productIdQuantityMap;
     }
 
@@ -460,7 +488,7 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
      * 核心逻辑：
      * 1. 获取较长时间范围内的历史销售数据，供预测模型使用。
      * 2. 对每个商品进行未来若干天（默认4天）的销量预测。
-     * 3. 结合当前库存，计算每个商品的“缺口销量” = max(预测总销量 - 当前库存, 0)，表示建议补货的数量。
+     * 3. 结合当前库存，计算每个商品的"缺口销量" = max(预测总销量 - 当前库存, 0)，表示建议补货的数量。
      * 4. 统计所有商品的缺口销量总和，计算每个商品的缺口权重 = 该商品缺口 / 总缺口。
      * 5. 按照权重，将总预算拆分分配给各商品，预算越多表示该商品越紧缺。
      * 6. 根据每个商品的单价，将分配的预算转化为采购数量，向下取整保证不超预算。
@@ -482,33 +510,63 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
         // 获取历史销售数据，供预测模型使用
         Map<LocalDate, SalesStatisticsDTO> historicalDataMap = statisticsService.calculateDailyStatistics(startDate, endDate);
 
+        // 使用自定义线程池进行并发预测，提高效率并控制资源使用
+        Map<Integer, CompletableFuture<double[]>> forecastFutures = new HashMap<>();
+        // 为每个商品创建异步预测任务
+        for (ProductBudgetInfo info : productInfoList) {
+            // 使用自定义线程池而不是@Async注解
+            forecastFutures.put(
+                info.getProductId(),
+                forecastService.forecastProductTotalWithCustomExecutor(
+                    info.getProductId(),
+                    historicalDataMap,
+                    forecastDays
+                )
+            );
+            log.debug("已提交商品[{}]的预测任务", info.getProductName());
+        }
+        
+        // 等待所有预测完成
+        CompletableFuture.allOf(forecastFutures.values().toArray(new CompletableFuture[0])).join();
+        log.info("所有预测任务已完成，开始处理结果");
+        
         // 存储每个商品的缺口销量
         Map<Integer, Double> productGapMap = new HashMap<>();
         // 所有商品的缺口销量总和
         double totalGap = 0.0;
 
-        // 遍历每个商品，预测销量并计算缺口
+        // 遍历每个商品，处理预测结果并计算缺口
         for (ProductBudgetInfo info : productInfoList) {
             try {
-                // 调用预测服务，预测未来forecastDays天的销量
-                double[] forecast = forecastService.forecastProductTotal(info.getProductId(), historicalDataMap, forecastDays);
+                // 获取预测结果
+                double[] forecast = forecastFutures.get(info.getProductId()).get();
                 // 计算预测期内的总销量
                 double forecastSum = Arrays.stream(forecast).sum();
                 // 计算缺口销量 = max(预测销量 - 当前库存, 0)，避免负值
                 double gap = Math.max(forecastSum - info.getCurrentStock(), 0);
                 productGapMap.put(info.getProductId(), gap);
                 totalGap += gap;
+                
+                log.debug("商品[{}]: 预测销量={}, 当前库存={}, 缺口={}", 
+                    info.getProductName(), forecastSum, info.getCurrentStock(), gap);
             } catch (Exception e) {
                 // 预测失败时，缺口视为0
+                log.error("商品[{}]预测失败: {}", info.getProductName(), e.getMessage());
                 productGapMap.put(info.getProductId(), 0.0);
             }
+        }
+
+        // 如果所有商品都没有缺口，直接返回空结果
+        if (totalGap <= 0) {
+            log.info("所有商品库存充足，无需采购");
+            return result;
         }
 
         // 根据缺口销量占比，分配预算并计算采购数量
         for (ProductBudgetInfo info : productInfoList) {
             double gap = productGapMap.getOrDefault(info.getProductId(), 0.0);
-            if (gap <= 0 || totalGap == 0) {
-                // 缺口为0或总缺口为0时，不分配预算
+            if (gap <= 0) {
+                // 缺口为0时，不分配预算
                 result.put(info.getProductId(), 0);
                 continue;
             }
@@ -517,6 +575,9 @@ public class PurchaseService implements BaseRepository<Purchase, PurchaseQuery> 
             // 采购数量 = 预算 / 单价，向下取整避免超预算
             int quantity = productBudget.divide(info.getUnitPrice(), 0, BigDecimal.ROUND_DOWN).intValue();
             result.put(info.getProductId(), quantity);
+            
+            log.debug("商品[{}]: 分配预算={}, 建议采购数量={}", 
+                info.getProductName(), productBudget, quantity);
         }
 
         // 返回每个商品的采购数量

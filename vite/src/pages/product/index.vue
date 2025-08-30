@@ -230,7 +230,7 @@
 
 import draggable from 'vuedraggable'
 import api from "@/api";
-import { showFailToast, showSuccessToast } from "vant";
+import { showFailToast, showSuccessToast, showConfirmDialog } from "vant";
 import {ROUTE_NAMES} from "@/constants/routeNames.js";
 
 
@@ -377,11 +377,26 @@ export default {
     },
     async deleteItem(id) {
       try {
-        await api.product.deleteProduct(id);
+        // 显示确认对话框
+        await showConfirmDialog({
+          title: '确认删除',
+          message: '确定要删除这个商品吗？删除后无法恢复。',
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          confirmButtonColor: '#ee0a24'
+        });
+
+        // 修复API调用参数格式
+        await api.product.deleteProduct({ productId: id });
         this.goodsList = this.goodsList.filter(item => item.id !== id);
         showSuccessToast("商品已删除");
       } catch (error) {
+        // 用户取消删除的情况
+        if (error === 'cancel' || error.message === 'cancel') {
+          return;
+        }
         console.error('删除商品失败:', error);
+        showFailToast("删除失败：" + (error.message || '未知错误'));
       }
     },
     editItem(item) {

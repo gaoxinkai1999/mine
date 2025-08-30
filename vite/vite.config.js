@@ -36,7 +36,14 @@ export default defineConfig({
      * 添加以下配置解决
      */
     server: {				// ← ← ← ← ← ←
-        host: '0.0.0.0'	// ← 新增内容 ←
+        host: '0.0.0.0',	// ← 新增内容 ←
+        proxy: {
+            '/api': {
+                target: 'http://192.168.0.102:8085', // 后端服务地址
+                changeOrigin: true, // 修改请求头中的 Host 为 target
+                secure: false, // 如果后端是 HTTP，忽略 HTTPS 验证
+            },
+        },
     },
 
     resolve: {

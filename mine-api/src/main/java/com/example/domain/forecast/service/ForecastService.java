@@ -7,12 +7,20 @@ import com.example.domain.statistics.dto.response.SalesStatisticsDTO;
 import com.example.exception.MyException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 /**
@@ -25,6 +33,15 @@ public class ForecastService {
 
     private final List<ForecastStrategy> strategies;
     private final ProductService productService; // 注入 ProductService
+    
+    // 预测任务的线程池
+    private Executor forecastExecutor;
+    
+    @Value("${forecast.threadpool.size:10}")
+    private int threadPoolSize;
+    
+    @Value("${prophet.max-connections:20}")
+    private int prophetMaxConnections;
 
     /**
      * 构造函数，注入所有可用的预测策略和 ProductService。
@@ -45,6 +62,37 @@ public class ForecastService {
                                                             .map(ForecastStrategy::getStrategyName)
                                                             .collect(Collectors.joining(", ")));
     }
+    
+    /**
+     * 初始化线程池和HTTP连接池
+     */
+    @PostConstruct
+    public void init() {
+        // 创建预测任务专用的线程池
+        forecastExecutor = Executors.newFixedThreadPool(threadPoolSize);
+        log.info("初始化预测服务线程池，大小: {}", threadPoolSize);
+        
+        // 配置Prophet服务的HTTP连接池
+        configProphetHttpClient();
+        
+        log.info("预测服务初始化完成");
+    }
+    
+    /**
+     * 配置与Prophet服务通信的HTTP客户端
+     * 这里只是一个示例，实际实现需要根据具体使用的HTTP客户端库
+     */
+    private void configProphetHttpClient() {
+        // 这里应该实现对HTTP客户端的配置
+        // 例如，如果使用OkHttp或Apache HttpClient，应该在这里配置连接池
+        log.info("配置Prophet服务HTTP连接池，最大连接数: {}", prophetMaxConnections);
+        
+        // 具体实现示例(使用Apache HttpClient的情况):
+        // PoolingHttpClientConnectionManager connManager = new PoolingHttpClientConnectionManager();
+        // connManager.setMaxTotal(prophetMaxConnections);
+        // connManager.setDefaultMaxPerRoute(prophetMaxConnections);
+        // httpClient = HttpClients.custom().setConnectionManager(connManager).build();
+    }
 
     /**
      * 预测单个商品的未来销量总和。
@@ -59,19 +107,25 @@ public class ForecastService {
     public double[] forecastProductTotal(int productId, Map<LocalDate, SalesStatisticsDTO> historicalDataMap, int forecastDays) throws MyException {
         // 1. 提取该商品的原始日销量数据
         double[] rawDailySales = getProductData(historicalDataMap, productId);
-        log.debug("商品ID: {}, 原始数据长度: {}", productId, rawDailySales.length);
+        log.debug("商品ID: {}, 原始日数据长度: {}", productId, rawDailySales.length);
 
-        double[] weeklyData = aggregateToWeeklyData(rawDailySales);
+        // 周聚合数据不再在此处统一计算，策略如果需要会自行聚合
+        // double[] weeklyData = aggregateToWeeklyData(rawDailySales);
 
         ForecastStrategy selectedStrategy = strategies.stream()
-                                                    .filter(strategy -> strategy.canHandle(weeklyData.length))
+                                                    // 现在 canHandle 接收原始日数据长度
+                                                    .filter(strategy -> strategy.canHandle(rawDailySales.length))
+                                                    // 按 getMinDataLength 降序排序，优先选择数据需求量大的策略
+                                                    .sorted(Comparator.comparingInt(ForecastStrategy::getMinDataLength).reversed())
                                                     .findFirst()
                                                     .orElseThrow(() -> new MyException("没有可用的预测策略"));
 
         // 4. 执行预测
         double[] dailyForecast;
         try {
-            dailyForecast = selectedStrategy.forecast(weeklyData, forecastDays);
+            // 所有策略的 forecast 方法现在都接收原始日数据
+            log.debug("商品ID: {}, 选择策略: {}, 传递原始日数据 (长度:{}) 进行预测。", productId, selectedStrategy.getStrategyName(), rawDailySales.length);
+            dailyForecast = selectedStrategy.forecast(rawDailySales, forecastDays);
         } catch (Exception e) {
             log.error("商品ID: {} 使用策略 {} 预测失败: {}", productId, selectedStrategy.getStrategyName(), e.getMessage(), e);
 
@@ -80,8 +134,48 @@ public class ForecastService {
 
         return dailyForecast;
     }
-
-
+    
+    /**
+     * 异步预测单个商品的未来销量总和。
+     * 与同步版本功能相同，但返回CompletableFuture以支持异步调用。
+     *
+     * @param productId         商品ID。
+     * @param historicalDataMap 包含按日期组织的销售统计数据的 Map。
+     * @param forecastDays      需要预测的未来天数。
+     * @return 包含预测结果的CompletableFuture。如果无法预测，则返回包含{0.0}的CompletableFuture。
+     */
+    @Async
+    public CompletableFuture<double[]> forecastProductTotalAsync(int productId, Map<LocalDate, SalesStatisticsDTO> historicalDataMap, int forecastDays) {
+        try {
+            log.debug("异步开始预测商品ID: {}", productId);
+            double[] result = forecastProductTotal(productId, historicalDataMap, forecastDays);
+            return CompletableFuture.completedFuture(result);
+        } catch (Exception e) {
+            log.error("商品ID: {} 异步预测失败: {}", productId, e.getMessage(), e);
+            return CompletableFuture.completedFuture(new double[]{0.0});
+        }
+    }
+    
+    /**
+     * 使用自定义线程池进行异步预测。
+     * 比@Async注解更灵活，可以指定使用专用的线程池。
+     *
+     * @param productId         商品ID。
+     * @param historicalDataMap 包含按日期组织的销售统计数据的 Map。
+     * @param forecastDays      需要预测的未来天数。
+     * @return 包含预测结果的CompletableFuture。
+     */
+    public CompletableFuture<double[]> forecastProductTotalWithCustomExecutor(int productId, Map<LocalDate, SalesStatisticsDTO> historicalDataMap, int forecastDays) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                log.debug("使用自定义线程池开始预测商品ID: {}", productId);
+                return forecastProductTotal(productId, historicalDataMap, forecastDays);
+            } catch (Exception e) {
+                log.error("商品ID: {} 预测失败: {}", productId, e.getMessage(), e);
+                return new double[]{0.0};
+            }
+        }, forecastExecutor);
+    }
 
     /**
      * 从按日期组织的销售统计数据中提取指定商品的日销量数组。
@@ -124,8 +218,6 @@ public class ForecastService {
         return dailySales;
     }
 
-
-
     /**
      * 提取总体销售额数据数组 (示例，如果其他地方需要)。
      *
@@ -151,7 +243,7 @@ public class ForecastService {
      * @param data 原始日销售数据
      * @return 按周聚合的销售数据
      */
-    public double[] aggregateToWeeklyData(double[] data) {
+    public static double[] aggregateToWeeklyData(double[] data) { // 改为 public static
         if (data == null || data.length < 7) {
             return new double[0];
         }

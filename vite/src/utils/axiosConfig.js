@@ -3,7 +3,7 @@ import {showFailToast} from 'vant'; // 替换成你实际使用的 Toast 组件
 // import { Loading } from 'element-ui'; // 如果需要 loading 功能，可以引入对应组件
 
 // 根据环境变量选择 baseURL
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.102:8085/api';
+const BASE_URL =  '/api';
 
 // 创建 axios 实例
 const instance = axios.create({

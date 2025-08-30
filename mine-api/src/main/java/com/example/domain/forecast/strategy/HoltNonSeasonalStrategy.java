@@ -1,8 +1,8 @@
 package com.example.domain.forecast.strategy;
 
+import com.example.domain.forecast.service.ForecastService;
 import com.example.exception.MyException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 
@@ -10,12 +10,12 @@ import java.util.Arrays;
  * Holt 双指数平滑 (非季节性) 预测策略。
  * 包含参数优化功能，基于时间序列交叉验证和网格搜索寻找最佳 alpha 和 beta。
  */
- @Component // 临时禁用HoltNonSeasonalStrategy */
+// @Component // 临时禁用HoltNonSeasonalStrategy
 @Slf4j
 public class HoltNonSeasonalStrategy implements ForecastStrategy {
 
-    // 定义该策略适用的最小数据长度
-    private static final int MIN_DATA_LENGTH = 10; // 至少需要10个点来做基本的 Holt 和 CV
+    // 定义该策略适用的最小数据长度（周数）
+    private static final int MIN_WEEKS_OF_DATA = 10; // 至少需要10周的聚合数据
 
     // --- 参数优化相关常量 ---
     // 网格搜索的范围和步长 (可以根据需要调整)
@@ -36,53 +36,54 @@ public class HoltNonSeasonalStrategy implements ForecastStrategy {
         return grid;
     }
     // 时间序列交叉验证中，用于初始训练的最小数据点数量
-    private static final int CV_INITIAL_TRAIN_SIZE = Math.max(5, MIN_DATA_LENGTH / 2); // 至少5个点，或者最小要求的一半
+    private static final int CV_INITIAL_TRAIN_SIZE = Math.max(5, MIN_WEEKS_OF_DATA / 2); // 至少5个点，或者最小要求的一半
     // 默认参数，在优化失败或数据不足时使用
     private static final double DEFAULT_ALPHA = 0.7;
     private static final double DEFAULT_BETA = 0.1;
 
     @Override
-    public double[] forecast(double[] historicalData, int forecastDays) throws MyException {
-        if (historicalData == null || historicalData.length == 0) {
-            log.warn("历史数据为空，无法进行 Holt 预测。");
+    public double[] forecast(double[] rawDailyData, int forecastDays) throws MyException { // 参数名改为 rawDailyData
+        // 首先将接收到的原始日数据聚合为周数据
+        double[] weeklyData = ForecastService.aggregateToWeeklyData(rawDailyData);
+
+        if (weeklyData == null || weeklyData.length == 0) {
+            log.warn("周聚合后的历史数据为空，无法进行 Holt 预测。商品原始日数据长度: {}", rawDailyData.length);
             return new double[forecastDays]; // 返回全零预测
         }
 
-        // 检查数据长度是否满足最小要求
-        if (!canHandle(historicalData.length)) {
-            log.warn("数据长度 ({}) 不足 {}，无法应用 Holt 策略。返回全零预测。", historicalData.length, MIN_DATA_LENGTH);
+        // 检查聚合后的周数据长度是否满足最小要求 (虽然canHandle已检查过原始数据，但这里再确认一次聚合结果)
+        if (weeklyData.length < MIN_WEEKS_OF_DATA) { // 注意：canHandle 使用的是转换后的周数，这里是实际聚合后的周数
+            log.warn("周聚合后数据长度 ({}) 不足 {}，无法应用 Holt 策略。返回全零预测。原始日数据长度: {}", weeklyData.length, MIN_WEEKS_OF_DATA, rawDailyData.length);
             return new double[forecastDays];
         }
 
         try {
             // 1. 参数优化 (使用时间序列交叉验证)
             double[] optimalParams={0.5,0.1};
-            // double[] optimalParams = optimizeParameters(historicalData);
+            // double[] optimalParams = optimizeParameters(weeklyData); // 使用周数据进行优化
             double optimalAlpha = optimalParams[0];
             double optimalBeta = optimalParams[1];
-            log.info("商品数据长度: {}, 优化后的 Holt 参数: alpha={}, beta={}", historicalData.length, String.format("%.3f", optimalAlpha), String.format("%.3f", optimalBeta));
+            log.info("商品周数据长度: {}, 优化后的 Holt 参数: alpha={}, beta={}", weeklyData.length, String.format("%.3f", optimalAlpha), String.format("%.3f", optimalBeta));
 
             // 2. 使用优化后的参数执行最终预测
             double[] forecastResult = forecastHoltNonSeasonalInternal(
-                    historicalData, // 使用完整的历史数据进行最终预测
+                    weeklyData, // 使用聚合后的周数据进行最终预测
                     forecastDays,
                     optimalAlpha,
                     optimalBeta
             );
 
             // 可选：计算并记录优化后模型在 *整个* 训练集上的拟合误差 (注意：这是样本内误差)
-            double[] fittedTrain = forecastHoltNonSeasonalInternal(historicalData, historicalData.length, optimalAlpha, optimalBeta);
-            double maeInSample = calculateMAEInternal(historicalData, fittedTrain);
-            log.info("Holt Non-Seasonal (Optimized) 模型在训练集上的拟合 MAE: {}", String.format("%.4f", maeInSample));
+            double[] fittedTrain = forecastHoltNonSeasonalInternal(weeklyData, weeklyData.length, optimalAlpha, optimalBeta);
+            double maeInSample = calculateMAEInternal(weeklyData, fittedTrain);
+            log.info("Holt Non-Seasonal (Optimized) 模型在周数据训练集上的拟合 MAE: {}", String.format("%.4f", maeInSample));
 
             log.debug("Holt Non-Seasonal (Optimized) 预测完成，预测天数: {}, 结果: {}", forecastDays, Arrays.toString(forecastResult));
             return forecastResult;
 
         } catch (Exception e) {
-            log.error("Holt Non-Seasonal 策略执行失败 (数据长度 {}): {}", historicalData.length, e.getMessage(), e);
-            // 在失败时可以考虑返回一个默认预测或重新抛出异常
-            // 这里选择抛出，让上层处理
-            throw new MyException("Holt Non-Seasonal 预测失败: " + e.getMessage());
+            log.error("Holt Non-Seasonal 策略执行失败 (周数据长度 {}): {}", weeklyData.length, e.getMessage(), e);
+            throw new MyException("Holt Non-Seasonal 策略执行失败: " + e.getMessage());
         }
     }
 
@@ -268,9 +269,13 @@ public class HoltNonSeasonalStrategy implements ForecastStrategy {
     // --- ForecastStrategy 接口实现 ---
 
     @Override
-    public boolean canHandle(int dataLength) {
-        // 策略适用于至少有 MIN_DATA_LENGTH 个数据点的情况
-        return dataLength >= MIN_DATA_LENGTH;
+    public boolean canHandle(int rawDataLength) {
+        // 将原始日数据长度转换为大致的周数，然后与策略要求的最小周数比较
+        // 注意：这里的转换可能与 ForecastService.aggregateToWeeklyData 的精确结果略有不同，
+        // 因为 aggregateToWeeklyData 会处理不足一周的余数。但用于 canHandle 初筛已足够。
+        if (rawDataLength < 7) return false; // 如果连一周的原始数据都没有，肯定不行
+        int potentialWeeks = rawDataLength / 7; 
+        return potentialWeeks >= MIN_WEEKS_OF_DATA;
     }
 
     @Override
@@ -280,7 +285,7 @@ public class HoltNonSeasonalStrategy implements ForecastStrategy {
 
     @Override
     public int getMinDataLength() {
-        // 返回该策略适用的最小数据长度，用于排序
-        return MIN_DATA_LENGTH;
+        // 返回该策略适用的等效最小原始日数据天数，用于排序
+        return MIN_WEEKS_OF_DATA * 7; 
     }
 }

@@ -174,6 +174,64 @@ async function sendPrinterData(characteristic, cmd) {
     }
 }
 
+/**
+ * 按商品类别排序订单详情
+ * 排序规则：
+ * 1. 首先按商品类别ID（categoryId）升序排序
+ * 2. 相同类别内按商品名称中文拼音顺序排序
+ * @param {Array} orderDetails 订单详情数组
+ * @returns {Array} 排序后的订单详情数组
+ */
+function sortOrderDetailsByCategory(orderDetails) {
+    if (!orderDetails || !Array.isArray(orderDetails)) {
+        return [];
+    }
+    
+    // 使用浅拷贝避免修改原数组
+    return [...orderDetails].sort((a, b) => {
+        const categoryIdA = a.product?.categoryId || 0;
+        const categoryIdB = b.product?.categoryId || 0;
+        
+        // 首先按类别ID排序（数字越小排越前）
+        if (categoryIdA !== categoryIdB) {
+            return categoryIdA - categoryIdB;
+        }
+        
+        // 如果类别相同，按商品名称中文排序
+        const nameA = a.product?.name || '';
+        const nameB = b.product?.name || '';
+        return nameA.localeCompare(nameB, 'zh-CN', { numeric: true });
+    });
+}
+
+/**
+ * 按商品类别排序退货订单详情
+ * 排序规则与销售订单相同
+ * @param {Array} returnOrderDetails 退货订单详情数组
+ * @returns {Array} 排序后的退货订单详情数组
+ */
+function sortReturnOrderDetailsByCategory(returnOrderDetails) {
+    if (!returnOrderDetails || !Array.isArray(returnOrderDetails)) {
+        return [];
+    }
+    
+    // 使用浅拷贝避免修改原数组
+    return [...returnOrderDetails].sort((a, b) => {
+        const categoryIdA = a.product?.categoryId || 0;
+        const categoryIdB = b.product?.categoryId || 0;
+        
+        // 首先按类别ID排序（数字越小排越前）
+        if (categoryIdA !== categoryIdB) {
+            return categoryIdA - categoryIdB;
+        }
+        
+        // 如果类别相同，按商品名称中文排序
+        const nameA = a.product?.name || '';
+        const nameB = b.product?.name || '';
+        return nameA.localeCompare(nameB, 'zh-CN', { numeric: true });
+    });
+}
+
 // 格式化打印小票
 export function formatReceipt(order, isPrinting) {
     const {shop, createTime, totalSalesAmount, orderDetails} = order;
@@ -192,8 +250,9 @@ export function formatReceipt(order, isPrinting) {
         receipt += padRight("商品名称", 14) + padRight("数量", 6) + padRight("单价", 8) + padRight("总价", 8) + '\n';
     }
     
-    // 使用公共的商品格式化函数
-    orderDetails.forEach(detail => {
+    // 对订单详情按类别排序，然后使用公共的商品格式化函数
+    const sortedOrderDetails = sortOrderDetailsByCategory(orderDetails);
+    sortedOrderDetails.forEach(detail => {
         receipt += formatSaleProductRow(detail, isPrinting);
     });
     
@@ -227,8 +286,9 @@ export function formatReturnReceipt(order, isPrinting) {
         receipt += padRight("商品名称", 14) + padRight("类型", 8) + padRight("数量", 6) + padRight("金额", 8) + '\n';
     }
     
-    // 使用公共的退货商品格式化函数
-    returnOrderDetails.forEach(detail => {
+    // 对退货订单详情按类别排序，然后使用公共的退货商品格式化函数
+    const sortedReturnOrderDetails = sortReturnOrderDetailsByCategory(returnOrderDetails);
+    sortedReturnOrderDetails.forEach(detail => {
         receipt += formatReturnProductRow(detail, isPrinting);
     });
     
@@ -286,11 +346,17 @@ export function formatMergedReceipt(orders, isPrinting) {
             receipt += padRight("商品名称", 14) + padRight("数量", 6) + padRight("单价", 8) + padRight("总价", 8) + '\n';
         }
         
+        // 收集所有销售订单的详情并排序
+        let allSalesDetails = [];
         salesOrders.forEach(order => {
-            order.orderDetails.forEach(detail => {
-                receipt += formatSaleProductRow(detail, isPrinting);
-            });
+            allSalesDetails.push(...order.orderDetails);
             totalSalesAmount += Number(order.totalSalesAmount);
+        });
+        
+        // 对所有销售订单详情按类别排序
+        const sortedSalesDetails = sortOrderDetailsByCategory(allSalesDetails);
+        sortedSalesDetails.forEach(detail => {
+            receipt += formatSaleProductRow(detail, isPrinting);
         });
         
         if (isPrinting) {
@@ -312,11 +378,17 @@ export function formatMergedReceipt(orders, isPrinting) {
             receipt += padRight("商品名称", 14) + padRight("类型", 8) + padRight("数量", 6) + padRight("金额", 8) + '\n';
         }
         
+        // 收集所有退货订单的详情并排序
+        let allReturnDetails = [];
         returnOrders.forEach(order => {
-            order.returnOrderDetails.forEach(detail => {
-                receipt += formatReturnProductRow(detail, isPrinting);
-            });
+            allReturnDetails.push(...order.returnOrderDetails);
             totalReturnAmount += Number(order.amount);
+        });
+        
+        // 对所有退货订单详情按类别排序
+        const sortedReturnDetails = sortReturnOrderDetailsByCategory(allReturnDetails);
+        sortedReturnDetails.forEach(detail => {
+            receipt += formatReturnProductRow(detail, isPrinting);
         });
         
         if (isPrinting) {

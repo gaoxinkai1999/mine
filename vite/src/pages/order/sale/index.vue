@@ -39,7 +39,7 @@
 
         <!-- 订单详情 -->
         <div class="order-details">
-          <div v-for="(orderDetail, detailIndex) in item.orderDetails"
+          <div v-for="(orderDetail, detailIndex) in getSortedOrderDetails(item.orderDetails)"
                :key="detailIndex"
                class="order-detail-item"
           >
@@ -204,6 +204,36 @@ export default {
   },
   
   methods: {
+    /**
+     * 按商品类别排序订单详情
+     * 排序规则：
+     * 1. 首先按商品类别ID（categoryId）升序排序
+     * 2. 相同类别内按商品名称中文拼音顺序排序
+     * @param {Array} orderDetails 订单详情数组
+     * @returns {Array} 排序后的订单详情数组
+     */
+    getSortedOrderDetails(orderDetails) {
+      if (!orderDetails || !Array.isArray(orderDetails)) {
+        return [];
+      }
+      
+      // 使用浅拷贝避免修改原数组
+      return [...orderDetails].sort((a, b) => {
+        const categoryIdA = a.product?.categoryId || 0;
+        const categoryIdB = b.product?.categoryId || 0;
+        
+        // 首先按类别ID排序（数字越小排越前）
+        if (categoryIdA !== categoryIdB) {
+          return categoryIdA - categoryIdB;
+        }
+        
+        // 如果类别相同，按商品名称中文排序
+        const nameA = a.product?.name || '';
+        const nameB = b.product?.name || '';
+        return nameA.localeCompare(nameB, 'zh-CN', { numeric: true });
+      });
+    },
+    
     openActionSheet(order) {
       this.selectedOrder = order;
       // 动态禁用/启用修改欠款按钮 (如果商家信息不存在)

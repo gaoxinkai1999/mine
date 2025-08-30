@@ -65,10 +65,14 @@ spring:
       #    也可以单独设置 keep-alive-between-time-millis
 
 
-
-
-
-
+# Prophet预测服务配置
+forecast:
+  prophet:
+    # Prophet服务API地址
+    api:
+      url: http://localhost:8000
+    # 是否启用高精度模式
+    high-accuracy: true
 
 
 
