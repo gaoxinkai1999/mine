@@ -405,7 +405,7 @@ if (-not $SkipDeploy) {
 
         # 4. 修复服务器上的文件权限和所有权
         $remoteDistPathForPerms = "'$remoteDistPath'" # 路径可能包含空格，用引号包裹
-        $sshChownCommand = "chown -R www:www $remoteDistPathForPerms"
+        $sshChownCommand = "chown -R root:root $remoteDistPathForPerms"
         $sshChmodDirCommand = "find $remoteDistPathForPerms -type d -exec chmod 755 {} \;"
         $sshChmodFileCommand = "find $remoteDistPathForPerms -type f -exec chmod 644 {} \;"
         

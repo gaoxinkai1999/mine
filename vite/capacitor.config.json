@@ -43,7 +43,7 @@
     }
   },
   "server": {
-    "url": "https://a.abocidee.com",
+    "url": "http://192.168.0.102:5173",
     "cleartext": true
   }
 }

@@ -6,7 +6,7 @@
 
 module.exports = {
   // --- Web 相关 ---
-  webVersion: "1.3.8", // 当前最新的 Web 版本 (发布新 Web 版本时修改这里)
+  webVersion: "1.3.9", // 当前最新的 Web 版本 (发布新 Web 版本时修改这里)
 
   // --- Native (Android) 相关 ---
   nativeVersionName: "1.4.5", // 当前最新的 Native 版本名 (发布新 Native 版本时修改这里)
@@ -21,8 +21,8 @@ module.exports = {
 
   // --- (可选) 更新说明 ---
   // 每次发布时可以更新这些说明
-  webReleaseNotes: "新增了非批次管理商品转化为批次管理商品的功能",
-  nativeReleaseNotes: "提升了稳定性。\n优化了用户体验。"
+  webReleaseNotes: "1.Fixed product deletion 2.Sort order items by category",
+  nativeReleaseNotes: "Improved stability and user experience"
 };
 
 // Helper function to generate full APK URL

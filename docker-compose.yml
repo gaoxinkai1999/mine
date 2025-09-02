@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  prophet-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: prophet-forecast-service:dev
+    container_name: prophet-service
+    ports:
+      - "8000:8000"
+    environment:
+      - PROPHET_SERVICE_HOST=0.0.0.0
+      - PROPHET_SERVICE_PORT=8000
+      - PROPHET_SERVICE_WORKERS=2
+      - PROPHET_LOG_LEVEL=INFO
+      - PROPHET_MAX_CV_WORKERS=2
+    volumes:
+      # 开发时可以挂载代码目录实现热更新
+      # - ./:/app
+      # 如果不需要热更新，可以注释上面的行并使用下面的配置挂载日志目录
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s 

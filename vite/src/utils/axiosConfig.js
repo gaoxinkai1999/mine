@@ -7,7 +7,7 @@ const BASE_URL =  '/api';
 
 // 创建 axios 实例
 const instance = axios.create({
-    baseURL: BASE_URL, // 使用环境变量中的 API URL
+    baseURL: 'https://new.abocidee.com/api', // 使用环境变量中的 API URL
     timeout: 10000, // 请求超时时间
 });
 
